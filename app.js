@@ -96,69 +96,105 @@ function hideTyping() {
 }
 
 // Process user query
-function processQuery(query) {
+async function processQuery(query) {
     const q = query.toLowerCase();
     let response;
+    let usedLLM = false;
 
-    // Check for list all subjects
-    if (q.includes('list') && (q.includes('subject') || q.includes('all'))) {
-        response = createSubjectsList();
-    }
-    // Check for specific unit query
-    else if (q.includes('unit')) {
-        const unitMatch = q.match(/unit\s*(\d+)/i);
-        const unitNum = unitMatch ? parseInt(unitMatch[1]) : null;
+    // Check for LLM-specific queries (study help, notes, exam prep)
+    const needsLLM = q.includes('prepare') || q.includes('study') || q.includes('notes') ||
+        q.includes('explain') || q.includes('help') || q.includes('ct1') ||
+        q.includes('ct2') || q.includes('exam') || q.includes('how to') ||
+        q.includes('important') || q.includes('tips');
 
-        // Try to find subject name in query
+    // If LLM is configured and query needs intelligent response
+    if (isLLMConfigured() && needsLLM) {
+        // Get relevant syllabus context
         const subject = findSubjectInQuery(q);
+        const context = subject ? subject : { subjects: getAllSubjects() };
 
-        if (subject && unitNum) {
-            const result = findSubjectUnit(subject.name, unitNum);
-            if (result && result.unit) {
-                response = createUnitCard(result.subject, result.unit);
+        const llmResponse = await callLLM(query, context);
+        if (llmResponse) {
+            response = formatLLMResponse(llmResponse);
+            usedLLM = true;
+        }
+    }
+
+    // If no LLM response, use local search
+    if (!response) {
+        // Check for list all subjects
+        if (q.includes('list') && (q.includes('subject') || q.includes('all'))) {
+            response = createSubjectsList();
+        }
+        // Check for specific unit query
+        else if (q.includes('unit')) {
+            const unitMatch = q.match(/unit\s*(\d+)/i);
+            const unitNum = unitMatch ? parseInt(unitMatch[1]) : null;
+
+            // Try to find subject name in query
+            const subject = findSubjectInQuery(q);
+
+            if (subject && unitNum) {
+                const result = findSubjectUnit(subject.name, unitNum);
+                if (result && result.unit) {
+                    response = createUnitCard(result.subject, result.unit);
+                } else {
+                    response = `<p>I couldn't find Unit ${unitNum} for <strong>${subject.name}</strong>. This subject has ${subject.units.length} units.</p>`;
+                }
+            } else if (subject) {
+                response = createSyllabusCard(subject);
             } else {
-                response = `<p>I couldn't find Unit ${unitNum} for <strong>${subject.name}</strong>. This subject has ${subject.units.length} units.</p>`;
+                response = `<p>I couldn't identify the subject. Try asking about a specific subject like:</p>
+                    <div class="suggestions">
+                        <button class="suggestion-btn" onclick="askQuestion('What is Unit 1 of AgentOps?')">Unit 1 of AgentOps</button>
+                        <button class="suggestion-btn" onclick="askQuestion('Show me Deep Learning Unit 2')">Deep Learning Unit 2</button>
+                    </div>`;
             }
-        } else if (subject) {
-            response = createSyllabusCard(subject);
-        } else {
-            response = `<p>I couldn't identify the subject. Try asking about a specific subject like:</p>
-                <div class="suggestions">
-                    <button class="suggestion-btn" onclick="askQuestion('What is Unit 1 of AgentOps?')">Unit 1 of AgentOps</button>
-                    <button class="suggestion-btn" onclick="askQuestion('Show me Deep Learning Unit 2')">Deep Learning Unit 2</button>
-                </div>`;
         }
-    }
-    // Check for syllabus query
-    else if (q.includes('syllabus') || q.includes('what is') || q.includes('show me') || q.includes('tell me about')) {
-        const subject = findSubjectInQuery(q);
-        if (subject) {
-            response = createSyllabusCard(subject);
-        } else {
-            response = `<p>I couldn't find that subject. Here are the available subjects:</p>` + createSubjectsList();
+        // Check for syllabus query
+        else if (q.includes('syllabus') || q.includes('what is') || q.includes('show me') || q.includes('tell me about')) {
+            const subject = findSubjectInQuery(q);
+            if (subject) {
+                response = createSyllabusCard(subject);
+            } else {
+                response = `<p>I couldn't find that subject. Here are the available subjects:</p>` + createSubjectsList();
+            }
         }
-    }
-    // Check for topic search
-    else if (q.includes('topic') || q.includes('where') || q.includes('find')) {
-        const topics = searchTopics(q.replace(/topic|where|find|is|the|in|which/gi, '').trim());
-        if (topics.length > 0) {
-            response = createTopicResults(topics);
-        } else {
-            response = `<p>I couldn't find that topic. Try searching for something else or view a subject's syllabus.</p>`;
+        // Check for topic search
+        else if (q.includes('topic') || q.includes('where') || q.includes('find')) {
+            const topics = searchTopics(q.replace(/topic|where|find|is|the|in|which/gi, '').trim());
+            if (topics.length > 0) {
+                response = createTopicResults(topics);
+            } else {
+                response = `<p>I couldn't find that topic. Try searching for something else or view a subject's syllabus.</p>`;
+            }
         }
-    }
-    // Default: try to find a subject
-    else {
-        const subject = findSubjectInQuery(q);
-        if (subject) {
-            response = createSyllabusCard(subject);
-        } else {
-            response = `<p>I'm not sure what you're looking for. Here's what I can help you with:</p>
-                <div class="suggestions">
-                    <button class="suggestion-btn" onclick="askQuestion('List all subjects')">📋 All Subjects</button>
-                    <button class="suggestion-btn" onclick="askQuestion('What is the syllabus for Machine Learning?')">🤖 ML Syllabus</button>
-                    <button class="suggestion-btn" onclick="askQuestion('Show me Deep Learning Unit 4')">🧠 DL Unit 4</button>
-                </div>`;
+        // Default: try to find a subject
+        else {
+            const subject = findSubjectInQuery(q);
+            if (subject) {
+                response = createSyllabusCard(subject);
+            } else {
+                // If LLM is not configured, show helper message
+                if (!isLLMConfigured()) {
+                    response = `<p>I'm not sure what you're looking for. Here's what I can help you with:</p>
+                        <div class="suggestions">
+                            <button class="suggestion-btn" onclick="askQuestion('List all subjects')">📋 All Subjects</button>
+                            <button class="suggestion-btn" onclick="askQuestion('What is the syllabus for Machine Learning?')">🤖 ML Syllabus</button>
+                            <button class="suggestion-btn" onclick="askQuestion('Show me Deep Learning Unit 4')">🧠 DL Unit 4</button>
+                        </div>
+                        <p style="margin-top: 12px; font-size: 0.85rem; color: var(--text-muted);">💡 <em>Tip: Add an OpenRouter API key in llm.js for smarter responses!</em></p>`;
+                } else {
+                    // Try LLM for unknown queries
+                    const llmResponse = await callLLM(query, { subjects: getAllSubjects() });
+                    if (llmResponse) {
+                        response = formatLLMResponse(llmResponse);
+                        usedLLM = true;
+                    } else {
+                        response = `<p>I couldn't understand that. Try asking about a specific subject or topic.</p>`;
+                    }
+                }
+            }
         }
     }
 
