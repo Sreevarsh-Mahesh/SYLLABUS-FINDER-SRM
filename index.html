@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>SRM Syllabus Finder | CINTEL</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,20 +32,20 @@
                 <div class="message bot-message">
                     <div class="message-avatar">🤖</div>
                     <div class="message-content">
-                        <p>Hi! I'm your <strong>Syllabus Finder</strong> assistant for SRM CINTEL department.</p>
-                        <p>Ask me about any subject syllabus! Try:</p>
-                        <div class="suggestions">
-                            <button class="suggestion-btn"
-                                onclick="askQuestion('What is the syllabus for AgentOps?')">📖 AgentOps
-                                Syllabus</button>
-                            <button class="suggestion-btn" onclick="askQuestion('Show me Machine Learning syllabus')">🤖
-                                Machine Learning</button>
-                            <button class="suggestion-btn"
-                                onclick="askQuestion('What topics are in Deep Learning Unit 2?')">🧠 Deep
-                                Learning</button>
-                            <button class="suggestion-btn" onclick="askQuestion('List all available subjects')">📋 All
-                                Subjects</button>
-                        </div>
+                        <p>👋 <strong>Hi there! I'm your SRM Study Buddy.</strong></p>
+                        <p>I'm here to help you navigate your academic journey smoothly. Here's what I can do for you
+                            right now:</p>
+                        <ul>
+                            <li>🔍 <strong>Identify Syllabi:</strong> Find the complete syllabus for any subject.</li>
+                            <li>🎯 <strong>Exam Prep:</strong> Pinpoint specific topics for CT1, CT2, or Semester exams.
+                            </li>
+                            <li>📚 <strong>Curriculum Details:</strong> Get full course breakdowns and unit lists.</li>
+                            <li>📖 <strong>Resources:</strong> Find recommended books and reference materials.</li>
+                        </ul>
+                        <br>
+                        <p><em>🚀 <strong>Coming soon:</strong> AI-generated notes and personalized revision
+                                summaries!</em></p>
+                        <p>What subject are you studying today?</p>
                     </div>
                 </div>
             </div>
@@ -66,6 +67,7 @@
     </div>
 
     <script src="syllabus.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="llm.js"></script>
     <script src="app.js"></script>
 </body>

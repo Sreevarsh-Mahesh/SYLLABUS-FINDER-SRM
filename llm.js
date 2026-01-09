@@ -99,29 +99,12 @@ function isLLMConfigured() {
 function formatLLMResponse(text) {
     if (!text) return null;
 
-    // Convert markdown-like formatting to HTML
-    let html = text
-        // Headers
-        .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-        .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-        .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-        // Bold
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        // Italic
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        // Code
-        .replace(/`(.+?)`/g, '<code>$1</code>')
-        // Line breaks
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
-
-    // Wrap in paragraph
-    html = '<p>' + html + '</p>';
-
-    // Convert bullet lists
-    html = html.replace(/<p>- (.+?)(<br>|<\/p>)/g, '<li>$1</li>$2');
-    html = html.replace(/<p>• (.+?)(<br>|<\/p>)/g, '<li>$1</li>$2');
-    html = html.replace(/(<li>.+<\/li>)+/g, '<ul>$&</ul>');
-
-    return html;
+    // Parse markdown to HTML using marked.js
+    try {
+        return marked.parse(text);
+    } catch (e) {
+        console.error("Markdown parsing error:", e);
+        // Fallback to basic text
+        return '<p>' + text.replace(/\n/g, '<br>') + '</p>';
+    }
 }

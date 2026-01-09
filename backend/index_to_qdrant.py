@@ -1,6 +1,5 @@
 """
-SRM Syllabus Indexer
-Downloads all department PDFs and indexes them into Qdrant
+SRM Syllabus Indexer - Fixed for smaller batch uploads
 """
 import os
 import httpx
@@ -10,54 +9,45 @@ from pypdf import PdfReader
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from sentence_transformers import SentenceTransformer
-from dotenv import load_dotenv
-import re
 
-load_dotenv()
+# Read .env manually
+with open('../.env', 'r') as f:
+    for line in f:
+        if '=' in line and not line.startswith('#'):
+            key, val = line.strip().split('=', 1)
+            os.environ[key] = val
 
-# Configuration
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = "srm_syllabus"
-CHUNK_SIZE = 500  # words per chunk
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 500
+BATCH_SIZE = 20  # Much smaller batch for reliable uploads
 
-# Initialize embedding model (runs locally, free!)
 print("Loading embedding model...")
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Initialize Qdrant client
 print("Connecting to Qdrant...")
-qdrant = QdrantClient(
-    url=QDRANT_URL,
-    api_key=QDRANT_API_KEY,
-)
+qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=120)
 
 
 def extract_department_from_filename(filename: str) -> str:
-    """Extract department name from PDF filename"""
     name = filename.replace('.pdf', '').replace('-', ' ').replace('_', ' ')
-    # Remove common suffixes
-    for suffix in ['syllabus', 'curriculum', '2021', '2018', '2015', 'core', 'elective']:
+    for suffix in ['syllabus', 'curriculum', '2021', '2018', '2015', '2024', '2025', 'core', 'elective', 'courses']:
         name = name.replace(suffix, '')
     return name.strip().title()
 
 
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
-    """Split text into overlapping chunks"""
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE) -> list:
     words = text.split()
     chunks = []
-    
-    for i in range(0, len(words), chunk_size - overlap):
+    for i in range(0, len(words), chunk_size - 50):
         chunk = " ".join(words[i:i + chunk_size])
-        if len(chunk) > 100:  # Skip very small chunks
+        if len(chunk) > 100:
             chunks.append(chunk)
-    
     return chunks
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract text from PDF file"""
     try:
         reader = PdfReader(pdf_path)
         text = ""
@@ -65,12 +55,11 @@ def extract_text_from_pdf(pdf_path: str) -> str:
             text += (page.extract_text() or "") + "\n\n"
         return text
     except Exception as e:
-        print(f"  Error reading {pdf_path}: {e}")
+        print(f"  Error reading PDF: {e}")
         return ""
 
 
 async def download_pdf(url: str, save_path: Path) -> bool:
-    """Download a PDF file"""
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(url, follow_redirects=True)
@@ -82,75 +71,82 @@ async def download_pdf(url: str, save_path: Path) -> bool:
     return False
 
 
-def create_collection():
-    """Create or recreate Qdrant collection"""
-    try:
-        qdrant.delete_collection(COLLECTION_NAME)
-        print("Deleted existing collection")
-    except:
-        pass
-    
-    qdrant.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=models.VectorParams(
-            size=384,  # all-MiniLM-L6-v2 embedding size
-            distance=models.Distance.COSINE
-        ),
-    )
-    print(f"Created collection: {COLLECTION_NAME}")
+def upload_batch(points: list, retries: int = 3) -> bool:
+    """Upload with retries"""
+    for attempt in range(retries):
+        try:
+            qdrant.upsert(
+                collection_name=COLLECTION_NAME,
+                points=points,
+                wait=True
+            )
+            return True
+        except Exception as e:
+            if attempt < retries - 1:
+                print(f"    Retry {attempt + 1}...")
+                import time
+                time.sleep(2)
+            else:
+                print(f"    ❌ Failed after {retries} attempts: {e}")
+    return False
 
 
 async def index_pdfs():
-    """Main indexing function"""
-    # Read PDF links
     pdf_links_file = Path("pdf_links.txt")
     if not pdf_links_file.exists():
-        print("Error: pdf_links.txt not found. Run scraping first.")
+        print("Error: pdf_links.txt not found")
         return
     
     pdf_urls = pdf_links_file.read_text().strip().split('\n')
     print(f"Found {len(pdf_urls)} PDF links")
     
-    # Create downloads directory
     downloads_dir = Path("downloads")
     downloads_dir.mkdir(exist_ok=True)
     
-    # Create collection
-    create_collection()
+    # Get current count
+    try:
+        info = qdrant.get_collection(COLLECTION_NAME)
+        start_count = info.points_count
+        print(f"Starting count: {start_count} vectors")
+    except:
+        # Create collection if doesn't exist
+        qdrant.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
+        )
+        start_count = 0
     
-    all_points = []
-    point_id = 0
+    # Get next point ID
+    point_id = start_count
+    total_uploaded = 0
     
     for i, url in enumerate(pdf_urls):
         filename = url.split('/')[-1]
         pdf_path = downloads_dir / filename
         
-        print(f"\n[{i+1}/{len(pdf_urls)}] Processing: {filename}")
+        print(f"\n[{i+1}/{len(pdf_urls)}] {filename}")
         
-        # Download if not exists
+        # Download if needed
         if not pdf_path.exists():
             print("  Downloading...")
             success = await download_pdf(url, pdf_path)
             if not success:
-                print("  ❌ Download failed, skipping")
                 continue
         
         # Extract text
-        print("  Extracting text...")
         text = extract_text_from_pdf(str(pdf_path))
         if not text:
-            print("  ❌ No text extracted, skipping")
             continue
         
-        # Chunk text
         chunks = chunk_text(text)
-        print(f"  Created {len(chunks)} chunks")
-        
-        # Extract department info
+        if not chunks:
+            continue
+            
+        print(f"  {len(chunks)} chunks")
         department = extract_department_from_filename(filename)
         
-        # Generate embeddings and create points
-        print("  Generating embeddings...")
+        # Generate embeddings and upload in small batches
+        batch_points = []
         for j, chunk in enumerate(chunks):
             embedding = embedder.encode(chunk).tolist()
             
@@ -162,47 +158,33 @@ async def index_pdfs():
                     "department": department,
                     "filename": filename,
                     "url": url,
-                    "chunk_index": j,
                 }
             )
-            all_points.append(point)
+            batch_points.append(point)
             point_id += 1
+            
+            # Upload when batch is full
+            if len(batch_points) >= BATCH_SIZE:
+                if upload_batch(batch_points):
+                    total_uploaded += len(batch_points)
+                batch_points = []
         
-        # Upload after each PDF to avoid timeout
-        if all_points:
-            print(f"  Uploading {len(all_points)} points...")
-            try:
-                qdrant.upsert(
-                    collection_name=COLLECTION_NAME,
-                    points=all_points
-                )
-                all_points = []
-            except Exception as e:
-                print(f"  ❌ Upload error: {e}")
-                all_points = []  # Clear and continue
+        # Upload remaining
+        if batch_points:
+            if upload_batch(batch_points):
+                total_uploaded += len(batch_points)
+        
+        print(f"  ✅ Uploaded (total: {total_uploaded})")
     
-    # Upload remaining points
-    if all_points:
-        print(f"\nUploading final batch of {len(all_points)} points...")
-        qdrant.upsert(
-            collection_name=COLLECTION_NAME,
-            points=all_points
-        )
-    
-    # Get collection info
+    # Final count
     info = qdrant.get_collection(COLLECTION_NAME)
     print(f"\n✅ Indexing complete!")
+    print(f"   New vectors added: {total_uploaded}")
     print(f"   Total vectors: {info.points_count}")
-    print(f"   Collection: {COLLECTION_NAME}")
 
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("SRM Syllabus Indexer")
+    print("SRM Syllabus Indexer (Fixed)")
     print("=" * 50)
-    
-    if not QDRANT_URL or not QDRANT_API_KEY:
-        print("Error: QDRANT_URL and QDRANT_API_KEY must be set in .env")
-        exit(1)
-    
     asyncio.run(index_pdfs())
