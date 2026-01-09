@@ -3,37 +3,74 @@ const LLM_CONFIG = {
     // OpenRouter API endpoint
     apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
 
-    // Free model options (no API key needed for some)
-    model: 'google/gemma-2-9b-it:free', // Free tier
+    // Free model - Using Meta Llama 3.1 8B (fast and reliable)
+    model: 'meta-llama/llama-3.1-8b-instruct:free',
 
     // Your OpenRouter API key (get from https://openrouter.ai)
-    // Leave empty to use the built-in smart search without LLM
-    apiKey: '' // User should add their key here
+    // ⚠️ For security, you can also set this via: localStorage.setItem('OPENROUTER_API_KEY', 'your-key')
+    apiKey: localStorage.getItem('OPENROUTER_API_KEY') || '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'
 };
 
 // System prompt for the LLM
-const SYSTEM_PROMPT = `You are a helpful SRM University syllabus assistant for the CINTEL (Computer Intelligence and Data Science) department.
+const SYSTEM_PROMPT = `You are an intelligent, friendly SRM University syllabus assistant for the CINTEL (Computer Intelligence and Data Science) department.
 
-Your role:
-1. Help students find subject syllabi
-2. Explain topics from the syllabus
-3. Guide students on what to study for exams (CT1, CT2, Semester)
-4. Generate concise study notes when asked
+IMPORTANT BEHAVIORS:
+1. BE CONVERSATIONAL - If the user's request is unclear or incomplete, ask clarifying questions
+2. BE SMART - Understand context and intent even from vague queries
+3. BE HELPFUL - Always provide value, even if you need more info
 
-Guidelines:
-- Be concise and helpful
-- Use bullet points for clarity
-- When showing syllabus, organize by units
-- For exam prep, focus on key topics
-- Be encouraging and supportive
+EXAMPLE INTERACTIONS:
+- User: "I need to prepare for a test" → Ask: "Which subject would you like to prepare for? I can help with AgentOps, Machine Learning, Deep Learning, NLP, or Computer Vision."
+- User: "unit 1 and 2" → If you know the subject from context, show those units. If not, ask which subject.
+- User: "what is backpropagation" → Search the syllabus and explain where it's covered and what it means.
 
-You have access to the syllabus data that will be provided in the context.`;
+YOUR CAPABILITIES:
+1. Find and display subject syllabi
+2. Explain any topic from the syllabus
+3. Create study plans for exams (CT1=Units 1-2, CT2=Units 3-4, Semester=All Units)
+4. Generate concise study notes
+5. Answer questions about topics in the syllabus
+
+RESPONSE FORMAT:
+- Keep responses concise but complete
+- Use bullet points and bold for clarity
+- When showing syllabus content, organize by units
+- Always be encouraging and supportive
+
+You have access to the complete syllabus data in the context. Use it to give accurate, helpful responses.`;
+
+// Conversation history for context
+let conversationHistory = [];
+const MAX_HISTORY = 10; // Keep last 10 messages for context
+
+// Add message to history
+function addToHistory(role, content) {
+    conversationHistory.push({ role, content });
+    if (conversationHistory.length > MAX_HISTORY) {
+        conversationHistory.shift(); // Remove oldest
+    }
+}
 
 // Call LLM with context
 async function callLLM(userMessage, syllabusContext) {
     if (!LLM_CONFIG.apiKey) {
+        console.log('No API key configured');
         return null; // Fall back to local search
     }
+
+    console.log('Calling LLM with query:', userMessage);
+
+    // Add user message to history
+    addToHistory('user', userMessage);
+
+    // Build messages array with history
+    const messages = [
+        {
+            role: 'system',
+            content: SYSTEM_PROMPT + `\n\nAVAILABLE SYLLABUS DATA:\n${JSON.stringify(syllabusContext, null, 2)}`
+        },
+        ...conversationHistory
+    ];
 
     try {
         const response = await fetch(LLM_CONFIG.apiUrl, {
@@ -46,33 +83,41 @@ async function callLLM(userMessage, syllabusContext) {
             },
             body: JSON.stringify({
                 model: LLM_CONFIG.model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: SYSTEM_PROMPT
-                    },
-                    {
-                        role: 'user',
-                        content: `Context - Available Syllabus Data:
-${JSON.stringify(syllabusContext, null, 2)}
-
-Student Question: ${userMessage}
-
-Please provide a helpful response based on the syllabus data.`
-                    }
-                ],
+                messages: messages,
                 max_tokens: 1000,
                 temperature: 0.7
             })
         });
 
+        console.log('LLM Response status:', response.status);
+
         if (!response.ok) {
-            console.error('LLM API error:', response.status);
+            const errorText = await response.text();
+            console.error('LLM API error:', response.status, errorText);
+
+            // Check for rate limiting
+            if (response.status === 429) {
+                return "⚠️ Rate limit reached. Please wait a moment and try again.";
+            }
             return null;
         }
 
         const data = await response.json();
-        return data.choices[0]?.message?.content || null;
+        console.log('LLM Response data:', data);
+
+        if (data.error) {
+            console.error('LLM returned error:', data.error);
+            return null;
+        }
+
+        const assistantMessage = data.choices?.[0]?.message?.content || null;
+
+        // Add assistant response to history for context
+        if (assistantMessage) {
+            addToHistory('assistant', assistantMessage);
+        }
+
+        return assistantMessage;
     } catch (error) {
         console.error('LLM call failed:', error);
         return null;
