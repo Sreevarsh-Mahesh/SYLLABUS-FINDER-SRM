@@ -1,6 +1,6 @@
 """
 SRM Study Buddy - RAG-based Intelligent Assistant
-FastAPI backend with OpenRouter (Nvidia Nemotron)
+FastAPI backend with Qdrant semantic search + OpenRouter LLM
 """
 import os
 import httpx
@@ -8,14 +8,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import json
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
 
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize FastAPI
-app = FastAPI(title="SRM Study Buddy API", version="1.0.0")
+app = FastAPI(title="SRM Study Buddy API", version="2.0.0")
 
 # CORS for frontend
 app.add_middleware(
@@ -26,14 +27,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API Key
+# Configuration
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+COLLECTION_NAME = "srm_syllabus"
+
+# Initialize embedding model
+print("Loading embedding model...")
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Initialize Qdrant client
+qdrant = None
+if QDRANT_URL and QDRANT_API_KEY:
+    print("Connecting to Qdrant...")
+    qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
 # System prompt
 SYSTEM_PROMPT = """You are an intelligent, friendly SRM University study buddy assistant.
 
 Your capabilities:
-1. Answer questions about any subject in the syllabus
+1. Answer questions about any subject from any department in SRM
 2. Help students prepare for exams (CT1, CT2, Semester)
 3. Generate study notes and summaries
 4. Explain complex topics simply
@@ -44,9 +58,10 @@ Guidelines:
 - Use bullet points for clarity
 - When explaining topics, relate to real-world examples
 - For exam prep: CT1 = Units 1-2, CT2 = Units 3-4, Semester = All units
-- Always cite which unit/subject the information is from
+- Always cite which department/subject the information is from
+- If you don't have specific syllabus info, be honest about it
 
-You have access to the SRM syllabus context provided below."""
+You have access to SRM's complete syllabus data across all departments."""
 
 
 # Request/Response models
@@ -60,10 +75,52 @@ class QueryResponse(BaseModel):
     success: bool = True
 
 
+def search_qdrant(query: str, limit: int = 5) -> tuple[str, list]:
+    """Semantic search in Qdrant"""
+    if not qdrant:
+        return "", []
+    
+    try:
+        # Generate embedding for query
+        query_embedding = embedder.encode(query).tolist()
+        
+        # Search Qdrant
+        results = qdrant.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_embedding,
+            limit=limit,
+            with_payload=True
+        )
+        
+        context_parts = []
+        sources = []
+        
+        for result in results:
+            payload = result.payload
+            text = payload.get("text", "")
+            dept = payload.get("department", "Unknown")
+            filename = payload.get("filename", "")
+            
+            context_parts.append(f"[{dept}]\n{text}")
+            
+            if dept not in [s.get("department") for s in sources]:
+                sources.append({
+                    "department": dept,
+                    "file": filename,
+                    "score": round(result.score, 3)
+                })
+        
+        return "\n\n---\n\n".join(context_parts), sources
+        
+    except Exception as e:
+        print(f"Qdrant search error: {e}")
+        return "", []
+
+
 async def call_openrouter(prompt: str) -> str:
     """Call OpenRouter API with Nvidia Nemotron model"""
     if not OPENROUTER_API_KEY:
-        raise Exception("OPENROUTER_API_KEY not set in environment")
+        raise Exception("OPENROUTER_API_KEY not set")
     
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
@@ -86,93 +143,82 @@ async def call_openrouter(prompt: str) -> str:
         )
         
         if response.status_code != 200:
-            raise Exception(f"OpenRouter error {response.status_code}: {response.text[:200]}")
+            raise Exception(f"OpenRouter error: {response.status_code}")
         
         data = response.json()
         return data["choices"][0]["message"]["content"]
 
 
-def get_syllabus_context(query: str) -> tuple[str, list]:
-    """Find relevant syllabus context for the query"""
-    try:
-        with open("syllabus.json", "r") as f:
-            syllabus = json.load(f)
-    except:
-        return "No syllabus data available.", []
-    
-    context_text = ""
-    sources = []
-    query_lower = query.lower()
-    
-    # Search for matching subjects
-    for subject in syllabus.get("subjects", []):
-        subject_name = subject.get("name", "").lower()
-        subject_code = subject.get("code", "").lower()
-        
-        # Check if query mentions this subject
-        if (subject_name in query_lower or 
-            query_lower in subject_name or
-            subject_code in query_lower or
-            any(word in subject_name for word in query_lower.split())):
-            
-            context_text += f"\n\n**{subject['name']} ({subject['code']})**\n"
-            for unit in subject.get("units", []):
-                context_text += f"\nUnit {unit['number']}: {unit['title']}\n"
-                context_text += "Topics: " + ", ".join(unit.get("topics", [])) + "\n"
-            
-            sources.append({"subject": subject["name"], "code": subject["code"]})
-    
-    # If no specific match, provide general context
-    if not context_text:
-        subjects_list = [s["name"] for s in syllabus.get("subjects", [])[:5]]
-        context_text = f"Available subjects: {', '.join(subjects_list)}"
-    
-    return context_text, sources
-
-
 @app.get("/")
 async def root():
     """Health check"""
+    vector_count = 0
+    if qdrant:
+        try:
+            info = qdrant.get_collection(COLLECTION_NAME)
+            vector_count = info.points_count
+        except:
+            pass
+    
     return {
         "status": "healthy",
-        "service": "SRM Study Buddy API",
-        "llm": "openrouter/nvidia-nemotron",
-        "api_key_set": bool(OPENROUTER_API_KEY)
+        "service": "SRM Study Buddy API v2.0",
+        "qdrant_connected": qdrant is not None,
+        "vectors_indexed": vector_count,
+        "llm": "openrouter/nvidia-nemotron"
     }
 
 
-@app.get("/api/subjects")
-async def get_subjects():
-    """Get list of subjects"""
+@app.get("/api/departments")
+async def get_departments():
+    """Get list of indexed departments"""
+    if not qdrant:
+        return {"departments": [], "count": 0}
+    
     try:
-        with open("syllabus.json", "r") as f:
-            data = json.load(f)
-        subjects = [{"name": s["name"], "code": s["code"]} for s in data.get("subjects", [])]
-        return {"subjects": subjects, "count": len(subjects)}
-    except:
-        return {"subjects": [], "count": 0}
+        # Scroll through to get unique departments
+        results, _ = qdrant.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=100,
+            with_payload=True
+        )
+        
+        departments = set()
+        for point in results:
+            dept = point.payload.get("department", "")
+            if dept:
+                departments.add(dept)
+        
+        return {"departments": sorted(list(departments)), "count": len(departments)}
+    except Exception as e:
+        return {"departments": [], "count": 0, "error": str(e)}
 
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
-    """Main chat endpoint"""
+    """Main RAG query endpoint with semantic search"""
     
     if not OPENROUTER_API_KEY:
-        raise HTTPException(
-            status_code=500, 
-            detail="OpenRouter API key not configured. Add OPENROUTER_API_KEY to Space secrets."
-        )
+        raise HTTPException(status_code=500, detail="OpenRouter API key not configured")
     
-    # Get syllabus context
-    context, sources = get_syllabus_context(request.query)
+    # Semantic search in Qdrant
+    context, sources = search_qdrant(request.query, limit=5)
     
     # Build prompt
-    prompt = f"""SYLLABUS CONTEXT:
+    if context:
+        prompt = f"""RELEVANT SYLLABUS CONTENT:
 {context}
 
 STUDENT QUESTION: {request.query}
 
-Provide a helpful, accurate response based on the syllabus context above:"""
+Based on the syllabus content above, provide a helpful and accurate response. 
+Cite the specific department/subject when referencing information."""
+    else:
+        prompt = f"""STUDENT QUESTION: {request.query}
+
+Note: I couldn't find specific syllabus content for this query.
+Provide a helpful response based on general academic knowledge, 
+but mention that you don't have specific SRM syllabus data for this topic."""
 
     try:
         answer = await call_openrouter(prompt)
@@ -182,26 +228,31 @@ Provide a helpful, accurate response based on the syllabus context above:"""
 
 
 @app.post("/api/search")
-async def search(request: QueryRequest):
-    """Search syllabus topics"""
+async def semantic_search(request: QueryRequest):
+    """Direct semantic search endpoint"""
+    if not qdrant:
+        return {"results": [], "count": 0, "error": "Qdrant not connected"}
+    
     try:
-        with open("syllabus.json", "r") as f:
-            syllabus = json.load(f)
+        query_embedding = embedder.encode(request.query).tolist()
         
-        results = []
-        query_lower = request.query.lower()
+        results = qdrant.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_embedding,
+            limit=10,
+            with_payload=True
+        )
         
-        for subject in syllabus.get("subjects", []):
-            for unit in subject.get("units", []):
-                for topic in unit.get("topics", []):
-                    if query_lower in topic.lower():
-                        results.append({
-                            "subject": subject["name"],
-                            "unit": f"Unit {unit['number']}: {unit['title']}",
-                            "topic": topic
-                        })
+        formatted = []
+        for r in results:
+            formatted.append({
+                "text": r.payload.get("text", "")[:500],
+                "department": r.payload.get("department", ""),
+                "file": r.payload.get("filename", ""),
+                "score": round(r.score, 3)
+            })
         
-        return {"results": results[:10], "count": len(results)}
+        return {"results": formatted, "count": len(formatted)}
     except Exception as e:
         return {"results": [], "count": 0, "error": str(e)}
 
