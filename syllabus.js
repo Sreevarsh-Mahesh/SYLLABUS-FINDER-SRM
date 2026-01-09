@@ -1,323 +1,573 @@
 // Syllabus Data - Embedded for fast loading
 const syllabusData = {
-    department: "CINTEL - Computer Intelligence and Data Science",
-    subjects: [
+    "department": "SRM CSE Department - Computing Programmes 2021",
+    "subjects": [
         {
-            code: "21AI601",
-            name: "AgentOps",
-            fullName: "Agent Operations and Autonomous Systems",
-            credits: 4,
-            type: "Professional Elective",
-            units: [
+            "code": "21CSS201T",
+            "name": "Computer Organization and Architecture",
+            "fullName": "Computer Organization and Architecture",
+            "credits": 3,
+            "type": "Engineering Science",
+            "units": [
                 {
-                    number: 1,
-                    title: "Introduction to Intelligent Agents",
-                    topics: [
-                        "Definition and characteristics of agents",
-                        "Agent architectures",
-                        "Reactive agents vs deliberative agents",
-                        "Agent communication languages",
-                        "Multi-agent systems overview"
+                    "number": 1,
+                    "title": "Introduction to Number System",
+                    "topics": [
+                        "Number Systems- Binary, Decimal, Octal, Hexadecimal",
+                        "Codes- Grey, BCD, Excess-3, ASCII, Parity",
+                        "Binary Arithmetic",
+                        "Logic Gates"
                     ]
                 },
                 {
-                    number: 2,
-                    title: "Agent Development Frameworks",
-                    topics: [
-                        "LangChain fundamentals",
-                        "AutoGen framework",
-                        "CrewAI for multi-agent orchestration",
-                        "Agent tools and function calling",
-                        "Memory and context management"
+                    "number": 2,
+                    "title": "Architectures",
+                    "topics": [
+                        "Functional Units of a computer",
+                        "Bus structures",
+                        "Addressing modes",
+                        "Case study: 8086"
                     ]
                 },
                 {
-                    number: 3,
-                    title: "Agent Operations and Monitoring",
-                    topics: [
-                        "AgentOps SDK integration",
-                        "Session tracking and replay",
-                        "Cost monitoring and optimization",
-                        "Error handling and debugging",
-                        "Performance benchmarking"
+                    "number": 3,
+                    "title": "Design of ALU",
+                    "topics": [
+                        "De Morgan's Theorem",
+                        "Adders, Multiplier",
+                        "Division-Restoring and Non-Restoring",
+                        "IEEE 754 Floating point"
                     ]
                 },
                 {
-                    number: 4,
-                    title: "Production Deployment",
-                    topics: [
-                        "Scaling agent systems",
-                        "API rate limiting strategies",
-                        "Security considerations",
-                        "Logging and observability",
-                        "CI/CD for AI agents"
+                    "number": 4,
+                    "title": "Control Unit",
+                    "topics": [
+                        "ALU operations",
+                        "Instruction execution",
+                        "Micro-programmed control",
+                        "Pipelining"
                     ]
                 },
                 {
-                    number: 5,
-                    title: "Advanced Topics",
-                    topics: [
-                        "Autonomous agent networks",
-                        "Self-improving agents",
-                        "Human-in-the-loop systems",
-                        "Ethical considerations",
-                        "Future of agentic AI"
+                    "number": 5,
+                    "title": "Parallelism",
+                    "topics": [
+                        "Flynn's classification",
+                        "ARM Processor",
+                        "ARM 5 and ARM 7 Architecture"
                     ]
                 }
             ]
         },
         {
-            code: "21AI602",
-            name: "Machine Learning",
-            fullName: "Machine Learning Fundamentals",
-            credits: 4,
-            type: "Core",
-            units: [
+            "code": "21CSC201J",
+            "name": "Data Structures and Algorithms",
+            "fullName": "Data Structures and Algorithms",
+            "credits": 4,
+            "type": "Professional Core",
+            "units": [
                 {
-                    number: 1,
-                    title: "Introduction to Machine Learning",
-                    topics: [
-                        "Types of learning: Supervised, Unsupervised, Reinforcement",
-                        "Model representation",
-                        "Training and testing methodology",
-                        "Bias-variance tradeoff",
-                        "Cross-validation techniques"
+                    "number": 1,
+                    "title": "Introduction",
+                    "topics": [
+                        "Primitive data types",
+                        "Pointers and structures",
+                        "Dynamic memory allocation",
+                        "Complexity - Time, Space"
                     ]
                 },
                 {
-                    number: 2,
-                    title: "Regression and Classification",
-                    topics: [
-                        "Linear regression",
-                        "Logistic regression",
-                        "Decision trees",
-                        "Support Vector Machines",
-                        "Evaluation metrics"
+                    "number": 2,
+                    "title": "List Structure",
+                    "topics": [
+                        "List ADT operations",
+                        "Singly, Doubly, Circular lists",
+                        "Sparse Matrix",
+                        "Polynomial Arithmetic"
                     ]
                 },
                 {
-                    number: 3,
-                    title: "Ensemble Methods",
-                    topics: [
-                        "Bagging and Random Forests",
-                        "Boosting algorithms (AdaBoost, XGBoost)",
-                        "Gradient boosting",
-                        "Model stacking",
-                        "Hyperparameter tuning"
+                    "number": 3,
+                    "title": "Stack and Queue",
+                    "topics": [
+                        "Stack ADT",
+                        "Infix to Postfix",
+                        "Queue ADT",
+                        "Priority Queue"
                     ]
                 },
                 {
-                    number: 4,
-                    title: "Unsupervised Learning",
-                    topics: [
-                        "K-means clustering",
+                    "number": 4,
+                    "title": "Trees and Hashing",
+                    "topics": [
+                        "Binary Search Trees",
+                        "AVL trees",
+                        "B Trees",
+                        "Hash functions",
+                        "Collision handling"
+                    ]
+                },
+                {
+                    "number": 5,
+                    "title": "Graph",
+                    "topics": [
+                        "Graph Traversal",
+                        "Topological sorting",
+                        "Prims Algorithm",
+                        "Dijkstra's Algorithm"
+                    ]
+                }
+            ]
+        },
+        {
+            "code": "21CSC202J",
+            "name": "Operating Systems",
+            "fullName": "Operating Systems",
+            "credits": 4,
+            "type": "Professional Core",
+            "units": [
+                {
+                    "number": 1,
+                    "title": "Introduction",
+                    "topics": [
+                        "Computer-System Architecture",
+                        "Operating-System Operations",
+                        "Process Management",
+                        "Memory Management"
+                    ]
+                },
+                {
+                    "number": 2,
+                    "title": "Process Management",
+                    "topics": [
+                        "Process Scheduling",
+                        "Threads",
+                        "Process Synchronization",
+                        "Semaphores"
+                    ]
+                },
+                {
+                    "number": 3,
+                    "title": "CPU Scheduling",
+                    "topics": [
+                        "Scheduling Algorithms",
+                        "Real-Time CPU Scheduling",
+                        "Deadlock Prevention"
+                    ]
+                },
+                {
+                    "number": 4,
+                    "title": "Memory Management",
+                    "topics": [
+                        "Paging",
+                        "Virtual Memory",
+                        "Page Replacement",
+                        "Disk Scheduling"
+                    ]
+                },
+                {
+                    "number": 5,
+                    "title": "Protection and Security",
+                    "topics": [
+                        "Access Matrix",
+                        "Cryptography",
+                        "User Authentication",
+                        "Firewalling"
+                    ]
+                }
+            ]
+        },
+        {
+            "code": "21CSC204J",
+            "name": "Design and Analysis of Algorithms",
+            "fullName": "Design and Analysis of Algorithms",
+            "credits": 4,
+            "type": "Professional Core",
+            "units": [
+                {
+                    "number": 1,
+                    "title": "Introduction to Algorithm Design",
+                    "topics": [
+                        "Time complexity analysis",
+                        "Asymptotic notations",
+                        "Recurrence relations",
+                        "Master Theorem"
+                    ]
+                },
+                {
+                    "number": 2,
+                    "title": "Divide and Conquer",
+                    "topics": [
+                        "Binary Search",
+                        "Merge sort",
+                        "Quick sort",
+                        "Strassen's Matrix multiplication"
+                    ]
+                },
+                {
+                    "number": 3,
+                    "title": "Greedy and Dynamic Programming",
+                    "topics": [
+                        "Huffman coding",
+                        "Knapsack problem",
+                        "Matrix chain multiplication",
+                        "Longest common subsequence"
+                    ]
+                },
+                {
+                    "number": 4,
+                    "title": "Backtracking",
+                    "topics": [
+                        "N queen's problem",
+                        "Branch and bound",
+                        "Travelling salesman problem",
+                        "Floyd-Warshall"
+                    ]
+                },
+                {
+                    "number": 5,
+                    "title": "Randomized and Approximation",
+                    "topics": [
+                        "Randomized quick sort",
+                        "Rabin Karp algorithm",
+                        "NP complete problems"
+                    ]
+                }
+            ]
+        },
+        {
+            "code": "21CSC205P",
+            "name": "Database Management Systems",
+            "fullName": "Database Management Systems",
+            "credits": 4,
+            "type": "Professional Core",
+            "units": [
+                {
+                    "number": 1,
+                    "title": "Introduction",
+                    "topics": [
+                        "Need for DBMS",
+                        "Database system Architecture",
+                        "ER diagram"
+                    ]
+                },
+                {
+                    "number": 2,
+                    "title": "Relational DBMS",
+                    "topics": [
+                        "ER to Relational",
+                        "Relational Algebra",
+                        "Tuple Relational calculus"
+                    ]
+                },
+                {
+                    "number": 3,
+                    "title": "SQL",
+                    "topics": [
+                        "SQL commands",
+                        "Joins",
+                        "Sub queries",
+                        "Views",
+                        "PL-SQL",
+                        "Triggers"
+                    ]
+                },
+                {
+                    "number": 4,
+                    "title": "Normalization",
+                    "topics": [
+                        "NF1, NF2, NF3, NF4, NF5",
+                        "BCNF"
+                    ]
+                },
+                {
+                    "number": 5,
+                    "title": "Concurrency Control",
+                    "topics": [
+                        "Transaction control",
+                        "Concurrency algorithms",
+                        "Recovery",
+                        "NoSQL Databases"
+                    ]
+                }
+            ]
+        },
+        {
+            "code": "21CSC305P",
+            "name": "Machine Learning",
+            "fullName": "Machine Learning Fundamentals",
+            "credits": 4,
+            "type": "Professional Core",
+            "units": [
+                {
+                    "number": 1,
+                    "title": "Introduction to ML",
+                    "topics": [
+                        "Supervised, Unsupervised Learning",
+                        "Bias-Variance tradeoff",
+                        "Cross-validation"
+                    ]
+                },
+                {
+                    "number": 2,
+                    "title": "Regression and Classification",
+                    "topics": [
+                        "Linear Regression",
+                        "Logistic Regression",
+                        "Decision Trees",
+                        "SVM"
+                    ]
+                },
+                {
+                    "number": 3,
+                    "title": "Ensemble Methods",
+                    "topics": [
+                        "Random Forests",
+                        "AdaBoost, XGBoost",
+                        "Gradient boosting"
+                    ]
+                },
+                {
+                    "number": 4,
+                    "title": "Unsupervised Learning",
+                    "topics": [
+                        "K-means",
                         "Hierarchical clustering",
-                        "Dimensionality reduction (PCA)",
-                        "Association rules",
+                        "PCA",
                         "Anomaly detection"
                     ]
                 },
                 {
-                    number: 5,
-                    title: "Neural Networks Basics",
-                    topics: [
-                        "Perceptron model",
-                        "Multi-layer perceptrons",
+                    "number": 5,
+                    "title": "Neural Networks",
+                    "topics": [
+                        "Perceptron",
+                        "MLP",
                         "Backpropagation",
-                        "Activation functions",
-                        "Introduction to deep learning"
+                        "Activation functions"
                     ]
                 }
             ]
         },
         {
-            code: "21AI603",
-            name: "Deep Learning",
-            fullName: "Deep Learning and Neural Networks",
-            credits: 4,
-            type: "Core",
-            units: [
+            "code": "21CSC401J",
+            "name": "Deep Learning",
+            "fullName": "Deep Learning Techniques",
+            "credits": 4,
+            "type": "Professional Core",
+            "units": [
                 {
-                    number: 1,
-                    title: "Deep Neural Networks",
-                    topics: [
-                        "Architecture of deep networks",
-                        "Optimization algorithms (SGD, Adam)",
-                        "Regularization techniques",
+                    "number": 1,
+                    "title": "Deep Neural Networks",
+                    "topics": [
+                        "Optimization algorithms",
                         "Batch normalization",
-                        "Dropout and weight decay"
+                        "Dropout"
                     ]
                 },
                 {
-                    number: 2,
-                    title: "Convolutional Neural Networks",
-                    topics: [
+                    "number": 2,
+                    "title": "CNN",
+                    "topics": [
                         "Convolution operation",
-                        "Pooling layers",
-                        "CNN architectures (VGG, ResNet)",
-                        "Transfer learning",
-                        "Image classification applications"
+                        "Pooling",
+                        "VGG, ResNet",
+                        "Transfer learning"
                     ]
                 },
                 {
-                    number: 3,
-                    title: "Recurrent Neural Networks",
-                    topics: [
+                    "number": 3,
+                    "title": "RNN",
+                    "topics": [
                         "Sequence modeling",
                         "LSTM and GRU",
-                        "Bidirectional RNNs",
-                        "Sequence-to-sequence models",
-                        "Attention mechanism basics"
+                        "Attention mechanism"
                     ]
                 },
                 {
-                    number: 4,
-                    title: "Transformers",
-                    topics: [
-                        "Self-attention mechanism",
-                        "Transformer architecture",
-                        "BERT and GPT models",
-                        "Fine-tuning pre-trained models",
-                        "Applications in NLP"
+                    "number": 4,
+                    "title": "Transformers",
+                    "topics": [
+                        "Self-attention",
+                        "BERT and GPT",
+                        "Vision Transformers"
                     ]
                 },
                 {
-                    number: 5,
-                    title: "Generative Models",
-                    topics: [
+                    "number": 5,
+                    "title": "Generative Models",
+                    "topics": [
                         "Autoencoders",
-                        "Variational Autoencoders",
-                        "Generative Adversarial Networks",
-                        "Diffusion models overview",
-                        "Applications and ethics"
+                        "VAE",
+                        "GANs",
+                        "Diffusion models"
                     ]
                 }
             ]
         },
         {
-            code: "21AI604",
-            name: "NLP",
-            fullName: "Natural Language Processing",
-            credits: 3,
-            type: "Core",
-            units: [
+            "code": "21CSE356T",
+            "name": "Natural Language Processing",
+            "fullName": "Natural Language Processing",
+            "credits": 3,
+            "type": "Professional Elective",
+            "units": [
                 {
-                    number: 1,
-                    title: "Text Processing Fundamentals",
-                    topics: [
-                        "Tokenization and text normalization",
-                        "Stemming and lemmatization",
-                        "Part-of-speech tagging",
-                        "Named entity recognition",
-                        "Regular expressions for NLP"
+                    "number": 1,
+                    "title": "Text Processing",
+                    "topics": [
+                        "Tokenization",
+                        "Stemming",
+                        "POS tagging",
+                        "NER"
                     ]
                 },
                 {
-                    number: 2,
-                    title: "Word Representations",
-                    topics: [
-                        "Bag of words model",
-                        "TF-IDF vectorization",
-                        "Word2Vec (Skip-gram, CBOW)",
-                        "GloVe embeddings",
+                    "number": 2,
+                    "title": "Word Representations",
+                    "topics": [
+                        "TF-IDF",
+                        "Word2Vec",
+                        "GloVe",
                         "Contextual embeddings"
                     ]
                 },
                 {
-                    number: 3,
-                    title: "Language Models",
-                    topics: [
-                        "N-gram language models",
-                        "Neural language models",
-                        "Perplexity and evaluation",
-                        "Beam search decoding",
-                        "Text generation"
+                    "number": 3,
+                    "title": "Language Models",
+                    "topics": [
+                        "N-gram models",
+                        "Neural LM",
+                        "BERT",
+                        "GPT"
                     ]
                 },
                 {
-                    number: 4,
-                    title: "NLP Applications",
-                    topics: [
-                        "Sentiment analysis",
-                        "Text classification",
-                        "Machine translation",
-                        "Question answering systems",
-                        "Summarization"
+                    "number": 4,
+                    "title": "NLP Applications",
+                    "topics": [
+                        "Sentiment Analysis",
+                        "Text Classification",
+                        "Machine Translation"
                     ]
                 },
                 {
-                    number: 5,
-                    title: "Large Language Models",
-                    topics: [
-                        "GPT architecture",
+                    "number": 5,
+                    "title": "LLMs",
+                    "topics": [
                         "Prompt engineering",
-                        "Fine-tuning LLMs",
-                        "RAG systems",
-                        "LLM evaluation and safety"
+                        "Fine-tuning",
+                        "RAG systems"
                     ]
                 }
             ]
         },
         {
-            code: "21AI605",
-            name: "Computer Vision",
-            fullName: "Computer Vision and Image Processing",
-            credits: 3,
-            type: "Professional Elective",
-            units: [
+            "code": "21CSE454T",
+            "name": "Computer Vision",
+            "fullName": "Computer Vision and Image Processing",
+            "credits": 3,
+            "type": "Professional Elective",
+            "units": [
                 {
-                    number: 1,
-                    title: "Image Fundamentals",
-                    topics: [
-                        "Digital image representation",
-                        "Color spaces (RGB, HSV)",
+                    "number": 1,
+                    "title": "Image Fundamentals",
+                    "topics": [
+                        "Color spaces",
                         "Image filtering",
-                        "Edge detection",
-                        "Morphological operations"
+                        "Edge detection"
                     ]
                 },
                 {
-                    number: 2,
-                    title: "Feature Detection",
-                    topics: [
-                        "Harris corner detection",
+                    "number": 2,
+                    "title": "Feature Detection",
+                    "topics": [
                         "SIFT and SURF",
                         "HOG features",
-                        "Feature matching",
-                        "Image stitching"
+                        "Feature matching"
                     ]
                 },
                 {
-                    number: 3,
-                    title: "Object Detection",
-                    topics: [
-                        "Sliding window approach",
-                        "Region-based CNNs (R-CNN family)",
-                        "YOLO architecture",
-                        "SSD and anchor boxes",
-                        "Non-maximum suppression"
+                    "number": 3,
+                    "title": "Object Detection",
+                    "topics": [
+                        "R-CNN family",
+                        "YOLO",
+                        "SSD"
                     ]
                 },
                 {
-                    number: 4,
-                    title: "Image Segmentation",
-                    topics: [
+                    "number": 4,
+                    "title": "Segmentation",
+                    "topics": [
                         "Semantic segmentation",
-                        "Instance segmentation",
-                        "U-Net architecture",
-                        "Mask R-CNN",
-                        "Panoptic segmentation"
+                        "U-Net",
+                        "Mask R-CNN"
                     ]
                 },
                 {
-                    number: 5,
-                    title: "Advanced Vision",
-                    topics: [
-                        "3D vision and depth estimation",
+                    "number": 5,
+                    "title": "Advanced Vision",
+                    "topics": [
+                        "3D vision",
                         "Video analysis",
-                        "Vision transformers (ViT)",
-                        "Multi-modal models (CLIP)",
-                        "Real-world applications"
+                        "Vision Transformers"
+                    ]
+                }
+            ]
+        },
+        {
+            "code": "21CSE253T",
+            "name": "Internet of Things",
+            "fullName": "Internet of Things",
+            "credits": 3,
+            "type": "Professional Elective",
+            "units": [
+                {
+                    "number": 1,
+                    "title": "Fundamentals of IoT",
+                    "topics": [
+                        "IoT Architectures",
+                        "Sensors and Actuators",
+                        "Smart Objects"
+                    ]
+                },
+                {
+                    "number": 2,
+                    "title": "IoT Protocols",
+                    "topics": [
+                        "IEEE 802.15.4",
+                        "LoRaWAN",
+                        "CoAP",
+                        "MQTT"
+                    ]
+                },
+                {
+                    "number": 3,
+                    "title": "Design and Development",
+                    "topics": [
+                        "Arduino",
+                        "Raspberry Pi",
+                        "IoT Prototyping"
+                    ]
+                },
+                {
+                    "number": 4,
+                    "title": "Data Analytics for IoT",
+                    "topics": [
+                        "NoSQL",
+                        "Apache Kafka",
+                        "Edge Analytics"
+                    ]
+                },
+                {
+                    "number": 5,
+                    "title": "IoT Applications",
+                    "topics": [
+                        "Smart Cities",
+                        "Industrial IoT",
+                        "Healthcare IoT"
                     ]
                 }
             ]
