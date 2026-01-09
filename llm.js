@@ -3,8 +3,8 @@ const LLM_CONFIG = {
     // Use our secure serverless API (API key is stored server-side)
     apiUrl: '/api/chat',
 
-    // Model to use (free tier) - Google Gemma 3n E4B
-    model: 'google/gemma-3n-e4b-it:free',
+    // Model to use (free tier) - Nvidia Nemotron (supports system prompts)
+    model: 'nvidia/nemotron-3-nano-30b-a3b:free',
 
     // For local development, you can set a key in localStorage
     // For production (Vercel), the key is in environment variables
@@ -68,8 +68,10 @@ async function callLLM(userMessage, syllabusContext) {
     ];
 
     try {
-        // Use serverless API (key is on server) or direct if local key exists
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        // Use serverless API (key is on server) or direct if local/file://
+        const isLocal = window.location.protocol === 'file:' ||
+            window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1';
         const useDirectApi = isLocal && LLM_CONFIG.localApiKey;
 
         const apiUrl = useDirectApi ? 'https://openrouter.ai/api/v1/chat/completions' : LLM_CONFIG.apiUrl;
@@ -130,10 +132,21 @@ async function callLLM(userMessage, syllabusContext) {
 
 // Check if LLM is configured
 function isLLMConfigured() {
-    // In production (Vercel), always use serverless API
-    // Locally, check if API key is in localStorage
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    return !isLocal || !!LLM_CONFIG.localApiKey;
+    // Check if running locally (file://, localhost, or 127.0.0.1)
+    const isLocal = window.location.protocol === 'file:' ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
+
+    // Locally: need API key in localStorage
+    // Production (Vercel): serverless API handles it
+    if (isLocal) {
+        if (!LLM_CONFIG.localApiKey) {
+            console.log('💡 Local mode: Set API key via console: localStorage.setItem("OPENROUTER_API_KEY", "your-key")');
+            return false;
+        }
+        return true;
+    }
+    return true; // Production (Vercel)
 }
 
 // Format LLM response to HTML
