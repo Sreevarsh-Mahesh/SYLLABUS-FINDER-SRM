@@ -118,35 +118,67 @@ def search_qdrant(query: str, limit: int = 5) -> tuple[str, list]:
 
 
 async def call_openrouter(prompt: str) -> str:
-    """Call OpenRouter API with Nvidia Nemotron model"""
+    """Call OpenRouter API with fallback models"""
     if not OPENROUTER_API_KEY:
         raise Exception("OPENROUTER_API_KEY not set")
     
+    # Extensive list of free models for maximum reliability (User Requested)
+    models = [
+        "google/gemini-2.0-flash-exp:free",
+        "xiaomi/mimo-v2-flash:free",
+        "nvidia/nemotron-3-nano-30b-a3b:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "google/gemma-2-9b-it:free",
+        "microsoft/phi-3-medium-128k-instruct:free",
+        "huggingfaceh4/zephyr-7b-beta:free",
+        "mistralai/mistral-7b-instruct:free",
+        "liquid/lfm-40b:free",
+        "meta-llama/llama-3-8b-instruct:free",
+        "qwen/qwen-2-7b-instruct:free"
+    ]
+    
+    
+    last_error = None
+
     async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://sreevarsh-srm-study-buddy.hf.space",
-                "X-Title": "SRM Study Buddy"
-            },
-            json={
-                "model": "nvidia/nemotron-3-nano-30b-a3b:free",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 1500,
-                "temperature": 0.7
-            }
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"OpenRouter error: {response.status_code}")
-        
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+        for model in models:
+            try:
+                print(f"Trying model: {model}...")
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://sreevarsh-srm-study-buddy.hf.space",
+                        "X-Title": "SRM Study Buddy"
+                    },
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 1500,
+                        "temperature": 0.7
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"]
+                
+                # If error, log it and try next model
+                error_body = response.text
+                print(f"Model {model} failed with {response.status_code}: {error_body}")
+                last_error = f"{response.status_code} - {error_body}"
+                
+            except Exception as e:
+                print(f"Exception with model {model}: {e}")
+                last_error = str(e)
+                continue
+
+    # If all models fail
+    raise Exception(f"All OpenRouter models failed. Last error: {last_error}")
 
 
 @app.get("/")
