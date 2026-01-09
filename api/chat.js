@@ -23,7 +23,7 @@ export default async function handler(req, res) {
                 'X-Title': 'SRM Syllabus Finder'
             },
             body: JSON.stringify({
-                model: model || 'google/gemma-3n-e4b-it:free',
+                model: model || 'nvidia/nemotron-3-nano-30b-a3b:free',
                 messages: messages,
                 max_tokens: 1000,
                 temperature: 0.7
