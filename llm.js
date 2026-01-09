@@ -51,7 +51,7 @@ async function callLLM(userMessage, syllabusContext) {
         // Return with sources if available
         if (data.sources && data.sources.length > 0) {
             const sourceInfo = data.sources
-                .map(s => `📚 ${s.subject}`)
+                .map(s => `📚 ${s.department || s.file}`)
                 .join(', ');
 
             return assistantMessage + `\n\n---\n*Source: ${sourceInfo}*`;
