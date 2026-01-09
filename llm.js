@@ -1,152 +1,142 @@
-// LLM Configuration
+// LLM Configuration for Study Buddy
 const LLM_CONFIG = {
-    // Use our secure serverless API (API key is stored server-side)
-    apiUrl: '/api/chat',
+    // Backend API URL (HuggingFace Spaces or local)
+    backendUrl: 'https://your-space.hf.space', // Update after deployment
 
-    // Model to use (free tier) - Nvidia Nemotron (supports system prompts)
-    model: 'nvidia/nemotron-3-nano-30b-a3b:free',
+    // Fallback to local for development
+    localBackend: 'http://localhost:7860',
 
-    // For local development, you can set a key in localStorage
-    // For production (Vercel), the key is in environment variables
-    localApiKey: localStorage.getItem('OPENROUTER_API_KEY') || ''
+    // For direct API calls (fallback)
+    geminiKey: localStorage.getItem('GEMINI_API_KEY') || ''
 };
-
-// System prompt for the LLM
-const SYSTEM_PROMPT = `You are an intelligent, friendly SRM University syllabus assistant for the CINTEL (Computer Intelligence and Data Science) department.
-
-IMPORTANT BEHAVIORS:
-1. BE CONVERSATIONAL - If the user's request is unclear or incomplete, ask clarifying questions
-2. BE SMART - Understand context and intent even from vague queries
-3. BE HELPFUL - Always provide value, even if you need more info
-
-EXAMPLE INTERACTIONS:
-- User: "I need to prepare for a test" → Ask: "Which subject would you like to prepare for? I can help with AgentOps, Machine Learning, Deep Learning, NLP, or Computer Vision."
-- User: "unit 1 and 2" → If you know the subject from context, show those units. If not, ask which subject.
-- User: "what is backpropagation" → Search the syllabus and explain where it's covered and what it means.
-
-YOUR CAPABILITIES:
-1. Find and display subject syllabi
-2. Explain any topic from the syllabus
-3. Create study plans for exams (CT1=Units 1-2, CT2=Units 3-4, Semester=All Units)
-4. Generate concise study notes
-5. Answer questions about topics in the syllabus
-
-RESPONSE FORMAT:
-- Keep responses concise but complete
-- Use bullet points and bold for clarity
-- When showing syllabus content, organize by units
-- Always be encouraging and supportive
-
-You have access to the complete syllabus data in the context. Use it to give accurate, helpful responses.`;
 
 // Conversation history for context
 let conversationHistory = [];
-const MAX_HISTORY = 10; // Keep last 10 messages for context
+const MAX_HISTORY = 10;
+
+// Check if we're in development mode
+function isLocalDev() {
+    return window.location.protocol === 'file:' ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
+}
+
+// Get the API URL
+function getApiUrl() {
+    if (isLocalDev()) {
+        return LLM_CONFIG.localBackend;
+    }
+    // In production, use the configured backend
+    return LLM_CONFIG.backendUrl !== 'https://your-space.hf.space'
+        ? LLM_CONFIG.backendUrl
+        : LLM_CONFIG.localBackend;
+}
 
 // Add message to history
 function addToHistory(role, content) {
     conversationHistory.push({ role, content });
     if (conversationHistory.length > MAX_HISTORY) {
-        conversationHistory.shift(); // Remove oldest
+        conversationHistory.shift();
     }
 }
 
-// Call LLM with context
+// Main LLM call function
 async function callLLM(userMessage, syllabusContext) {
-    console.log('Calling LLM with query:', userMessage);
+    console.log('Calling Study Buddy API with:', userMessage);
 
     // Add user message to history
     addToHistory('user', userMessage);
 
-    // Build messages array with history
-    const messages = [
-        {
-            role: 'system',
-            content: SYSTEM_PROMPT + `\n\nAVAILABLE SYLLABUS DATA:\n${JSON.stringify(syllabusContext, null, 2)}`
-        },
-        ...conversationHistory
-    ];
+    const apiUrl = getApiUrl();
 
     try {
-        // Use serverless API (key is on server) or direct if local/file://
-        const isLocal = window.location.protocol === 'file:' ||
-            window.location.hostname === 'localhost' ||
-            window.location.hostname === '127.0.0.1';
-        const useDirectApi = isLocal && LLM_CONFIG.localApiKey;
-
-        const apiUrl = useDirectApi ? 'https://openrouter.ai/api/v1/chat/completions' : LLM_CONFIG.apiUrl;
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-
-        // Only add auth header for direct API calls (local dev)
-        if (useDirectApi) {
-            headers['Authorization'] = `Bearer ${LLM_CONFIG.localApiKey}`;
-            headers['HTTP-Referer'] = window.location.href;
-            headers['X-Title'] = 'SRM Syllabus Finder';
-        }
-
-        const response = await fetch(apiUrl, {
+        // Try the RAG backend first
+        const response = await fetch(`${apiUrl}/api/query`, {
             method: 'POST',
-            headers: headers,
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
-                model: LLM_CONFIG.model,
-                messages: messages
+                query: userMessage,
+                history: conversationHistory.slice(-5)
             })
         });
 
-        console.log('LLM Response status:', response.status);
+        if (response.ok) {
+            const data = await response.json();
+            const assistantMessage = data.response;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('LLM API error:', response.status, errorText);
-
-            // Check for rate limiting
-            if (response.status === 429) {
-                return "⚠️ Rate limit reached. Please wait a moment and try again.";
+            // Add to history
+            if (assistantMessage) {
+                addToHistory('assistant', assistantMessage);
             }
-            return null;
+
+            // Return with sources if available
+            if (data.sources && data.sources.length > 0) {
+                const sourceInfo = data.sources
+                    .filter(s => s.subject !== 'Unknown')
+                    .map(s => `📚 ${s.subject} - ${s.unit}`)
+                    .join('\n');
+
+                return assistantMessage + (sourceInfo ? `\n\n---\n*Sources:*\n${sourceInfo}` : '');
+            }
+
+            return assistantMessage;
         }
 
-        const data = await response.json();
-        console.log('LLM Response data:', data);
-
-        if (data.error) {
-            console.error('LLM returned error:', data.error);
-            return null;
-        }
-
-        const assistantMessage = data.choices?.[0]?.message?.content || null;
-
-        // Add assistant response to history for context
-        if (assistantMessage) {
-            addToHistory('assistant', assistantMessage);
-        }
-
-        return assistantMessage;
+        console.log('Backend unavailable, falling back to local...');
     } catch (error) {
-        console.error('LLM call failed:', error);
-        return null;
+        console.log('Backend error, using fallback:', error.message);
     }
+
+    // Fallback: Use local syllabus data with Gemini directly
+    return await fallbackLLMCall(userMessage, syllabusContext);
 }
 
-// Check if LLM is configured
-function isLLMConfigured() {
-    // Check if running locally (file://, localhost, or 127.0.0.1)
-    const isLocal = window.location.protocol === 'file:' ||
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1';
+// Fallback function for direct Gemini calls
+async function fallbackLLMCall(userMessage, syllabusContext) {
+    const geminiKey = LLM_CONFIG.geminiKey || localStorage.getItem('GEMINI_API_KEY');
 
-    // Locally: need API key in localStorage
-    // Production (Vercel): serverless API handles it
-    if (isLocal) {
-        if (!LLM_CONFIG.localApiKey) {
-            console.log('💡 Local mode: Set API key via console: localStorage.setItem("OPENROUTER_API_KEY", "your-key")');
-            return false;
-        }
-        return true;
+    if (!geminiKey) {
+        return "⚠️ Backend unavailable and no API key configured. Please set up the backend or add a Gemini API key.";
     }
-    return true; // Production (Vercel)
+
+    const prompt = `You are a helpful SRM University study buddy.
+
+SYLLABUS DATA:
+${JSON.stringify(syllabusContext, null, 2)}
+
+STUDENT QUESTION: ${userMessage}
+
+Provide a helpful response:`;
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            }
+        );
+
+        if (response.ok) {
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response.";
+        }
+    } catch (error) {
+        console.error('Fallback LLM error:', error);
+    }
+
+    return "Sorry, I'm having trouble connecting. Please try again.";
+}
+
+// Check if LLM/Backend is configured
+function isLLMConfigured() {
+    // Always return true - we'll handle errors gracefully
+    return true;
 }
 
 // Format LLM response to HTML
@@ -177,4 +167,41 @@ function formatLLMResponse(text) {
     html = html.replace(/(<li>.+<\/li>)+/g, '<ul>$&</ul>');
 
     return html;
+}
+
+// Semantic search function
+async function searchSyllabus(query) {
+    const apiUrl = getApiUrl();
+
+    try {
+        const response = await fetch(`${apiUrl}/api/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+
+        if (response.ok) {
+            return await response.json();
+        }
+    } catch (error) {
+        console.error('Search error:', error);
+    }
+
+    return { results: [], count: 0 };
+}
+
+// Get available subjects
+async function getIndexedSubjects() {
+    const apiUrl = getApiUrl();
+
+    try {
+        const response = await fetch(`${apiUrl}/api/subjects`);
+        if (response.ok) {
+            return await response.json();
+        }
+    } catch (error) {
+        console.error('Get subjects error:', error);
+    }
+
+    return { subjects: [], count: 0 };
 }
