@@ -101,22 +101,20 @@ async function processQuery(query) {
     let response;
     let usedLLM = false;
 
-    // Check for LLM-specific queries (study help, notes, exam prep)
-    const needsLLM = q.includes('prepare') || q.includes('study') || q.includes('notes') ||
-        q.includes('explain') || q.includes('help') || q.includes('ct1') ||
-        q.includes('ct2') || q.includes('exam') || q.includes('how to') ||
-        q.includes('important') || q.includes('tips');
+    // If LLM is configured, always try it first for intelligent responses
+    if (isLLMConfigured()) {
+        // Always pass full syllabus data for maximum context
+        const context = syllabusData;
 
-    // If LLM is configured and query needs intelligent response
-    if (isLLMConfigured() && needsLLM) {
-        // Get relevant syllabus context
-        const subject = findSubjectInQuery(q);
-        const context = subject ? subject : { subjects: getAllSubjects() };
-
-        const llmResponse = await callLLM(query, context);
-        if (llmResponse) {
-            response = formatLLMResponse(llmResponse);
-            usedLLM = true;
+        try {
+            const llmResponse = await callLLM(query, context);
+            if (llmResponse) {
+                response = formatLLMResponse(llmResponse);
+                usedLLM = true;
+            }
+        } catch (error) {
+            console.error('LLM error:', error);
+            // Fall through to local search
         }
     }
 
