@@ -1,7 +1,7 @@
 // LLM Configuration for Study Buddy
 const LLM_CONFIG = {
-    // Backend API URL (HuggingFace Spaces or local)
-    backendUrl: 'https://your-space.hf.space', // Update after deployment
+    // Backend API URL (HuggingFace Spaces)
+    backendUrl: 'https://sreevarsh-srm-study-buddy.hf.space',
 
     // Fallback to local for development
     localBackend: 'http://localhost:7860',
