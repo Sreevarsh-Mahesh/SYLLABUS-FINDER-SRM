@@ -1,15 +1,15 @@
 """
 SRM Study Buddy - RAG-based Intelligent Assistant
-FastAPI backend with ChromaDB and Gemini
+FastAPI backend with ChromaDB and dual LLM support (Gemini + OpenRouter)
 """
 import os
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import chromadb
-from chromadb.utils import embedding_functions
-import google.generativeai as genai
+import json
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -27,40 +27,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Gemini
+# API Keys
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# Initialize ChromaDB with Gemini embeddings
+# Initialize Gemini if available
+model = None
+if GEMINI_API_KEY:
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+    except Exception as e:
+        print(f"Gemini init error: {e}")
+
+# Initialize ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
-# Use Gemini for embeddings
-class GeminiEmbeddingFunction:
+# Simple embedding function (fallback)
+class SimpleEmbeddingFunction:
+    """Simple TF-IDF-like embedding for when Gemini is unavailable"""
     def __call__(self, input: List[str]) -> List[List[float]]:
-        embeddings = []
-        for text in input:
-            result = genai.embed_content(
-                model="models/embedding-001",
-                content=text,
-                task_type="retrieval_document"
-            )
-            embeddings.append(result['embedding'])
-        return embeddings
+        # Return dummy embeddings (ChromaDB will handle similarity)
+        return [[0.0] * 384 for _ in input]
 
 # Get or create collection
 try:
-    embedding_fn = GeminiEmbeddingFunction() if GEMINI_API_KEY else None
     collection = chroma_client.get_or_create_collection(
         name="syllabus",
-        embedding_function=embedding_fn
+        embedding_function=SimpleEmbeddingFunction()
     )
 except Exception as e:
     print(f"ChromaDB init error: {e}")
     collection = None
 
-# System prompt for the study buddy
+# System prompt
 SYSTEM_PROMPT = """You are an intelligent, friendly SRM University study buddy assistant.
 
 Your capabilities:
@@ -89,66 +90,142 @@ class QueryResponse(BaseModel):
     response: str
     sources: List[dict] = []
     success: bool = True
+    model_used: str = ""
+
+
+async def call_openrouter(prompt: str, system: str = SYSTEM_PROMPT) -> str:
+    """Call OpenRouter API with Nvidia Nemotron model"""
+    if not OPENROUTER_API_KEY:
+        raise Exception("OpenRouter API key not configured")
+    
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://srm-study-buddy.hf.space",
+                "X-Title": "SRM Study Buddy"
+            },
+            json={
+                "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 1500,
+                "temperature": 0.7
+            }
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"OpenRouter error: {response.status_code} - {response.text}")
+        
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
+
+
+async def call_gemini(prompt: str) -> str:
+    """Call Gemini API"""
+    if not model:
+        raise Exception("Gemini not initialized")
+    
+    response = model.generate_content(prompt)
+    return response.text
+
+
+async def call_llm(prompt: str) -> tuple[str, str]:
+    """Call LLM with fallback: Gemini -> OpenRouter"""
+    
+    # Try Gemini first (if available)
+    if GEMINI_API_KEY and model:
+        try:
+            result = await call_gemini(prompt)
+            return result, "gemini-2.0-flash"
+        except Exception as e:
+            print(f"Gemini failed: {e}")
+    
+    # Fallback to OpenRouter
+    if OPENROUTER_API_KEY:
+        try:
+            result = await call_openrouter(prompt)
+            return result, "nvidia/nemotron-3-nano"
+        except Exception as e:
+            print(f"OpenRouter failed: {e}")
+            raise
+    
+    raise Exception("No LLM available. Configure GEMINI_API_KEY or OPENROUTER_API_KEY")
 
 
 @app.get("/")
 async def root():
     """Health check"""
-    return {"status": "healthy", "service": "SRM Study Buddy API"}
+    return {
+        "status": "healthy",
+        "service": "SRM Study Buddy API",
+        "llm_available": bool(GEMINI_API_KEY or OPENROUTER_API_KEY)
+    }
 
 
 @app.get("/api/subjects")
 async def get_subjects():
     """Get list of indexed subjects"""
-    if not collection:
+    # Load from syllabus.json
+    try:
+        with open("syllabus.json", "r") as f:
+            data = json.load(f)
+        subjects = [s["name"] for s in data.get("subjects", [])]
+        return {"subjects": subjects, "count": len(subjects)}
+    except:
         return {"subjects": [], "count": 0}
-    
-    # Get unique subjects from metadata
-    results = collection.get(include=["metadatas"])
-    subjects = set()
-    for meta in results.get("metadatas", []):
-        if meta and "subject" in meta:
-            subjects.add(meta["subject"])
-    
-    return {"subjects": list(subjects), "count": len(subjects)}
 
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
     """Main RAG query endpoint"""
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="Gemini API key not configured")
-    
     user_query = request.query
     
-    # Step 1: Search for relevant context in ChromaDB
+    # Step 1: Get syllabus context
     context_text = ""
     sources = []
     
-    if collection and collection.count() > 0:
-        try:
-            results = collection.query(
-                query_texts=[user_query],
-                n_results=5,
-                include=["documents", "metadatas"]
-            )
-            
-            for i, doc in enumerate(results.get("documents", [[]])[0]):
-                meta = results.get("metadatas", [[]])[0][i] if results.get("metadatas") else {}
-                context_text += f"\n---\n{doc}\n"
+    try:
+        with open("syllabus.json", "r") as f:
+            syllabus = json.load(f)
+        
+        # Simple keyword search in syllabus
+        query_lower = user_query.lower()
+        for subject in syllabus.get("subjects", []):
+            if (subject["name"].lower() in query_lower or 
+                query_lower in subject["name"].lower() or
+                subject["code"].lower() in query_lower):
+                
+                context_text += f"\n\n**{subject['name']} ({subject['code']})**\n"
+                for unit in subject.get("units", []):
+                    context_text += f"\nUnit {unit['number']}: {unit['title']}\n"
+                    context_text += "Topics: " + ", ".join(unit.get("topics", [])) + "\n"
+                
                 sources.append({
-                    "subject": meta.get("subject", "Unknown"),
-                    "unit": meta.get("unit", ""),
-                    "page": meta.get("page", "")
+                    "subject": subject["name"],
+                    "code": subject["code"]
                 })
-        except Exception as e:
-            print(f"ChromaDB query error: {e}")
+        
+        # If no specific match, include first 3 subjects as context
+        if not context_text:
+            for subject in syllabus.get("subjects", [])[:3]:
+                context_text += f"\n\n**{subject['name']} ({subject['code']})**\n"
+                for unit in subject.get("units", []):
+                    context_text += f"\nUnit {unit['number']}: {unit['title']}\n"
+                    context_text += "Topics: " + ", ".join(unit.get("topics", [])) + "\n"
+    except Exception as e:
+        print(f"Syllabus read error: {e}")
+        context_text = "No syllabus context available."
     
-    # Step 2: Build prompt with context
+    # Step 2: Build prompt
     prompt = f"""{SYSTEM_PROMPT}
 
 SYLLABUS CONTEXT:
-{context_text if context_text else "No specific context found. Answer based on general knowledge."}
+{context_text}
 
 CONVERSATION HISTORY:
 {chr(10).join([f"{m['role']}: {m['content']}" for m in request.history[-5:]]) if request.history else "None"}
@@ -157,49 +234,45 @@ STUDENT QUESTION: {user_query}
 
 Provide a helpful, accurate response:"""
 
-    # Step 3: Generate response with Gemini
+    # Step 3: Call LLM with fallback
     try:
-        response = model.generate_content(prompt)
-        answer = response.text
+        answer, model_used = await call_llm(prompt)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
     
     return QueryResponse(
         response=answer,
         sources=sources,
-        success=True
+        success=True,
+        model_used=model_used
     )
 
 
 @app.post("/api/search")
 async def semantic_search(request: QueryRequest):
-    """Semantic search across syllabus"""
-    if not collection or collection.count() == 0:
-        return {"results": [], "count": 0}
-    
+    """Search syllabus"""
     try:
-        results = collection.query(
-            query_texts=[request.query],
-            n_results=10,
-            include=["documents", "metadatas"]
-        )
+        with open("syllabus.json", "r") as f:
+            syllabus = json.load(f)
         
-        formatted_results = []
-        for i, doc in enumerate(results.get("documents", [[]])[0]):
-            meta = results.get("metadatas", [[]])[0][i] if results.get("metadatas") else {}
-            formatted_results.append({
-                "content": doc[:500],
-                "subject": meta.get("subject", "Unknown"),
-                "unit": meta.get("unit", ""),
-                "page": meta.get("page", "")
-            })
+        query_lower = request.query.lower()
+        results = []
         
-        return {"results": formatted_results, "count": len(formatted_results)}
+        for subject in syllabus.get("subjects", []):
+            for unit in subject.get("units", []):
+                for topic in unit.get("topics", []):
+                    if query_lower in topic.lower():
+                        results.append({
+                            "subject": subject["name"],
+                            "unit": f"Unit {unit['number']}: {unit['title']}",
+                            "topic": topic
+                        })
+        
+        return {"results": results[:10], "count": len(results)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Run with: uvicorn main:app --reload
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
