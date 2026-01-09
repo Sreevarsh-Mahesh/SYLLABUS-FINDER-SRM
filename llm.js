@@ -1,14 +1,14 @@
 // LLM Configuration
 const LLM_CONFIG = {
-    // OpenRouter API endpoint
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
+    // Use our secure serverless API (API key is stored server-side)
+    apiUrl: '/api/chat',
 
-    // Free model - Using Meta Llama 3.1 8B (fast and reliable)
+    // Model to use (free tier)
     model: 'meta-llama/llama-3.1-8b-instruct:free',
 
-    // Your OpenRouter API key (get from https://openrouter.ai)
-    // ⚠️ For security, you can also set this via: localStorage.setItem('OPENROUTER_API_KEY', 'your-key')
-    apiKey: localStorage.getItem('OPENROUTER_API_KEY') || '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'
+    // For local development, you can set a key in localStorage
+    // For production (Vercel), the key is in environment variables
+    localApiKey: localStorage.getItem('OPENROUTER_API_KEY') || ''
 };
 
 // System prompt for the LLM
@@ -53,11 +53,6 @@ function addToHistory(role, content) {
 
 // Call LLM with context
 async function callLLM(userMessage, syllabusContext) {
-    if (!LLM_CONFIG.apiKey) {
-        console.log('No API key configured');
-        return null; // Fall back to local search
-    }
-
     console.log('Calling LLM with query:', userMessage);
 
     // Add user message to history
@@ -73,19 +68,28 @@ async function callLLM(userMessage, syllabusContext) {
     ];
 
     try {
-        const response = await fetch(LLM_CONFIG.apiUrl, {
+        // Use serverless API (key is on server) or direct if local key exists
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const useDirectApi = isLocal && LLM_CONFIG.localApiKey;
+
+        const apiUrl = useDirectApi ? 'https://openrouter.ai/api/v1/chat/completions' : LLM_CONFIG.apiUrl;
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        // Only add auth header for direct API calls (local dev)
+        if (useDirectApi) {
+            headers['Authorization'] = `Bearer ${LLM_CONFIG.localApiKey}`;
+            headers['HTTP-Referer'] = window.location.href;
+            headers['X-Title'] = 'SRM Syllabus Finder';
+        }
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${LLM_CONFIG.apiKey}`,
-                'HTTP-Referer': window.location.href,
-                'X-Title': 'SRM Syllabus Finder'
-            },
+            headers: headers,
             body: JSON.stringify({
                 model: LLM_CONFIG.model,
-                messages: messages,
-                max_tokens: 1000,
-                temperature: 0.7
+                messages: messages
             })
         });
 
@@ -126,7 +130,10 @@ async function callLLM(userMessage, syllabusContext) {
 
 // Check if LLM is configured
 function isLLMConfigured() {
-    return !!LLM_CONFIG.apiKey;
+    // In production (Vercel), always use serverless API
+    // Locally, check if API key is in localStorage
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return !isLocal || !!LLM_CONFIG.localApiKey;
 }
 
 // Format LLM response to HTML
