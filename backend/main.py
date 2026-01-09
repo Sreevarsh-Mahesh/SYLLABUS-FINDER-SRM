@@ -44,24 +44,23 @@ if QDRANT_URL and QDRANT_API_KEY:
     qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
 # System prompt
-SYSTEM_PROMPT = """You are an intelligent, friendly SRM University study buddy assistant.
+SYSTEM_PROMPT = """You are a helpful and intelligent study buddy for SRM University students.
+Your goal is to answer questions about the syllabus, curriculum, and course details accurately based *only* on the provided context.
 
-Your capabilities:
-1. Answer questions about any subject from any department in SRM
-2. Help students prepare for exams (CT1, CT2, Semester)
-3. Generate study notes and summaries
-4. Explain complex topics simply
-5. Create study plans
+**Guidelines for Response:**
+1.  **Format Beautifully:** Use Markdown tables, bullet points, and bold text freely.
+    *   If listing subjects/units, use a table or structured list.
+    *   Example: | Unit | Topic | Description |
+2.  **Be Friendly & Concise:** Use a conversational tone (e.g., "Hey! Here's what I found..."). Avoid huge walls of text. Be crisp.
+3.  **Accuracy First:** If the context doesn't contain the answer, admit it honestly. Say "I couldn't find specific details in the syllabus, but typically..."
+4.  **Cite Sources:** When mentioning a specific fact, refer to the department or file it came from text if possible.
+5.  **Exam Prep:** CT1 = Units 1-2, CT2 = Units 3-4, Semester = All units.
 
-Guidelines:
-- Be conversational and encouraging
-- Use bullet points for clarity
-- When explaining topics, relate to real-world examples
-- For exam prep: CT1 = Units 1-2, CT2 = Units 3-4, Semester = All units
-- Always cite which department/subject the information is from
-- If you don't have specific syllabus info, be honest about it
-
-You have access to SRM's complete syllabus data across all departments."""
+**Structure:**
+*   Start with a friendly greeting.
+*   Present the main answer clearly (use Tables for lists!).
+*   End with a helpful follow-up suggestion.
+"""
 
 
 # Request/Response models
@@ -84,10 +83,11 @@ def search_qdrant(query: str, limit: int = 5) -> tuple[str, list]:
         # Generate embedding for query
         query_embedding = embedder.encode(query).tolist()
         
-        # Search Qdrant
-        results = qdrant.search(
+        # Search Qdrant using query_points (newer API)
+        from qdrant_client.http import models as rest
+        results = qdrant.query_points(
             collection_name=COLLECTION_NAME,
-            query_vector=query_embedding,
+            query=query_embedding,
             limit=limit,
             with_payload=True
         )
@@ -95,7 +95,7 @@ def search_qdrant(query: str, limit: int = 5) -> tuple[str, list]:
         context_parts = []
         sources = []
         
-        for result in results:
+        for result in results.points:
             payload = result.payload
             text = payload.get("text", "")
             dept = payload.get("department", "Unknown")
@@ -236,15 +236,15 @@ async def semantic_search(request: QueryRequest):
     try:
         query_embedding = embedder.encode(request.query).tolist()
         
-        results = qdrant.search(
+        results = qdrant.query_points(
             collection_name=COLLECTION_NAME,
-            query_vector=query_embedding,
+            query=query_embedding,
             limit=10,
             with_payload=True
         )
         
         formatted = []
-        for r in results:
+        for r in results.points:
             formatted.append({
                 "text": r.payload.get("text", "")[:500],
                 "department": r.payload.get("department", ""),
