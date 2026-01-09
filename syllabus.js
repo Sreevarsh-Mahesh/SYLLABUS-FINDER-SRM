@@ -1,0 +1,378 @@
+// Syllabus Data - Embedded for fast loading
+const syllabusData = {
+    department: "CINTEL - Computer Intelligence and Data Science",
+    subjects: [
+        {
+            code: "21AI601",
+            name: "AgentOps",
+            fullName: "Agent Operations and Autonomous Systems",
+            credits: 4,
+            type: "Professional Elective",
+            units: [
+                {
+                    number: 1,
+                    title: "Introduction to Intelligent Agents",
+                    topics: [
+                        "Definition and characteristics of agents",
+                        "Agent architectures",
+                        "Reactive agents vs deliberative agents",
+                        "Agent communication languages",
+                        "Multi-agent systems overview"
+                    ]
+                },
+                {
+                    number: 2,
+                    title: "Agent Development Frameworks",
+                    topics: [
+                        "LangChain fundamentals",
+                        "AutoGen framework",
+                        "CrewAI for multi-agent orchestration",
+                        "Agent tools and function calling",
+                        "Memory and context management"
+                    ]
+                },
+                {
+                    number: 3,
+                    title: "Agent Operations and Monitoring",
+                    topics: [
+                        "AgentOps SDK integration",
+                        "Session tracking and replay",
+                        "Cost monitoring and optimization",
+                        "Error handling and debugging",
+                        "Performance benchmarking"
+                    ]
+                },
+                {
+                    number: 4,
+                    title: "Production Deployment",
+                    topics: [
+                        "Scaling agent systems",
+                        "API rate limiting strategies",
+                        "Security considerations",
+                        "Logging and observability",
+                        "CI/CD for AI agents"
+                    ]
+                },
+                {
+                    number: 5,
+                    title: "Advanced Topics",
+                    topics: [
+                        "Autonomous agent networks",
+                        "Self-improving agents",
+                        "Human-in-the-loop systems",
+                        "Ethical considerations",
+                        "Future of agentic AI"
+                    ]
+                }
+            ]
+        },
+        {
+            code: "21AI602",
+            name: "Machine Learning",
+            fullName: "Machine Learning Fundamentals",
+            credits: 4,
+            type: "Core",
+            units: [
+                {
+                    number: 1,
+                    title: "Introduction to Machine Learning",
+                    topics: [
+                        "Types of learning: Supervised, Unsupervised, Reinforcement",
+                        "Model representation",
+                        "Training and testing methodology",
+                        "Bias-variance tradeoff",
+                        "Cross-validation techniques"
+                    ]
+                },
+                {
+                    number: 2,
+                    title: "Regression and Classification",
+                    topics: [
+                        "Linear regression",
+                        "Logistic regression",
+                        "Decision trees",
+                        "Support Vector Machines",
+                        "Evaluation metrics"
+                    ]
+                },
+                {
+                    number: 3,
+                    title: "Ensemble Methods",
+                    topics: [
+                        "Bagging and Random Forests",
+                        "Boosting algorithms (AdaBoost, XGBoost)",
+                        "Gradient boosting",
+                        "Model stacking",
+                        "Hyperparameter tuning"
+                    ]
+                },
+                {
+                    number: 4,
+                    title: "Unsupervised Learning",
+                    topics: [
+                        "K-means clustering",
+                        "Hierarchical clustering",
+                        "Dimensionality reduction (PCA)",
+                        "Association rules",
+                        "Anomaly detection"
+                    ]
+                },
+                {
+                    number: 5,
+                    title: "Neural Networks Basics",
+                    topics: [
+                        "Perceptron model",
+                        "Multi-layer perceptrons",
+                        "Backpropagation",
+                        "Activation functions",
+                        "Introduction to deep learning"
+                    ]
+                }
+            ]
+        },
+        {
+            code: "21AI603",
+            name: "Deep Learning",
+            fullName: "Deep Learning and Neural Networks",
+            credits: 4,
+            type: "Core",
+            units: [
+                {
+                    number: 1,
+                    title: "Deep Neural Networks",
+                    topics: [
+                        "Architecture of deep networks",
+                        "Optimization algorithms (SGD, Adam)",
+                        "Regularization techniques",
+                        "Batch normalization",
+                        "Dropout and weight decay"
+                    ]
+                },
+                {
+                    number: 2,
+                    title: "Convolutional Neural Networks",
+                    topics: [
+                        "Convolution operation",
+                        "Pooling layers",
+                        "CNN architectures (VGG, ResNet)",
+                        "Transfer learning",
+                        "Image classification applications"
+                    ]
+                },
+                {
+                    number: 3,
+                    title: "Recurrent Neural Networks",
+                    topics: [
+                        "Sequence modeling",
+                        "LSTM and GRU",
+                        "Bidirectional RNNs",
+                        "Sequence-to-sequence models",
+                        "Attention mechanism basics"
+                    ]
+                },
+                {
+                    number: 4,
+                    title: "Transformers",
+                    topics: [
+                        "Self-attention mechanism",
+                        "Transformer architecture",
+                        "BERT and GPT models",
+                        "Fine-tuning pre-trained models",
+                        "Applications in NLP"
+                    ]
+                },
+                {
+                    number: 5,
+                    title: "Generative Models",
+                    topics: [
+                        "Autoencoders",
+                        "Variational Autoencoders",
+                        "Generative Adversarial Networks",
+                        "Diffusion models overview",
+                        "Applications and ethics"
+                    ]
+                }
+            ]
+        },
+        {
+            code: "21AI604",
+            name: "NLP",
+            fullName: "Natural Language Processing",
+            credits: 3,
+            type: "Core",
+            units: [
+                {
+                    number: 1,
+                    title: "Text Processing Fundamentals",
+                    topics: [
+                        "Tokenization and text normalization",
+                        "Stemming and lemmatization",
+                        "Part-of-speech tagging",
+                        "Named entity recognition",
+                        "Regular expressions for NLP"
+                    ]
+                },
+                {
+                    number: 2,
+                    title: "Word Representations",
+                    topics: [
+                        "Bag of words model",
+                        "TF-IDF vectorization",
+                        "Word2Vec (Skip-gram, CBOW)",
+                        "GloVe embeddings",
+                        "Contextual embeddings"
+                    ]
+                },
+                {
+                    number: 3,
+                    title: "Language Models",
+                    topics: [
+                        "N-gram language models",
+                        "Neural language models",
+                        "Perplexity and evaluation",
+                        "Beam search decoding",
+                        "Text generation"
+                    ]
+                },
+                {
+                    number: 4,
+                    title: "NLP Applications",
+                    topics: [
+                        "Sentiment analysis",
+                        "Text classification",
+                        "Machine translation",
+                        "Question answering systems",
+                        "Summarization"
+                    ]
+                },
+                {
+                    number: 5,
+                    title: "Large Language Models",
+                    topics: [
+                        "GPT architecture",
+                        "Prompt engineering",
+                        "Fine-tuning LLMs",
+                        "RAG systems",
+                        "LLM evaluation and safety"
+                    ]
+                }
+            ]
+        },
+        {
+            code: "21AI605",
+            name: "Computer Vision",
+            fullName: "Computer Vision and Image Processing",
+            credits: 3,
+            type: "Professional Elective",
+            units: [
+                {
+                    number: 1,
+                    title: "Image Fundamentals",
+                    topics: [
+                        "Digital image representation",
+                        "Color spaces (RGB, HSV)",
+                        "Image filtering",
+                        "Edge detection",
+                        "Morphological operations"
+                    ]
+                },
+                {
+                    number: 2,
+                    title: "Feature Detection",
+                    topics: [
+                        "Harris corner detection",
+                        "SIFT and SURF",
+                        "HOG features",
+                        "Feature matching",
+                        "Image stitching"
+                    ]
+                },
+                {
+                    number: 3,
+                    title: "Object Detection",
+                    topics: [
+                        "Sliding window approach",
+                        "Region-based CNNs (R-CNN family)",
+                        "YOLO architecture",
+                        "SSD and anchor boxes",
+                        "Non-maximum suppression"
+                    ]
+                },
+                {
+                    number: 4,
+                    title: "Image Segmentation",
+                    topics: [
+                        "Semantic segmentation",
+                        "Instance segmentation",
+                        "U-Net architecture",
+                        "Mask R-CNN",
+                        "Panoptic segmentation"
+                    ]
+                },
+                {
+                    number: 5,
+                    title: "Advanced Vision",
+                    topics: [
+                        "3D vision and depth estimation",
+                        "Video analysis",
+                        "Vision transformers (ViT)",
+                        "Multi-modal models (CLIP)",
+                        "Real-world applications"
+                    ]
+                }
+            ]
+        }
+    ]
+};
+
+// Search functions
+function findSubject(query) {
+    const q = query.toLowerCase();
+    return syllabusData.subjects.find(subject => 
+        subject.name.toLowerCase().includes(q) ||
+        subject.fullName.toLowerCase().includes(q) ||
+        subject.code.toLowerCase().includes(q)
+    );
+}
+
+function findSubjectUnit(subjectQuery, unitNumber) {
+    const subject = findSubject(subjectQuery);
+    if (!subject) return null;
+    return {
+        subject,
+        unit: subject.units.find(u => u.number === unitNumber)
+    };
+}
+
+function getAllSubjects() {
+    return syllabusData.subjects.map(s => ({
+        code: s.code,
+        name: s.name,
+        fullName: s.fullName,
+        credits: s.credits,
+        type: s.type
+    }));
+}
+
+function searchTopics(query) {
+    const q = query.toLowerCase();
+    const results = [];
+    
+    syllabusData.subjects.forEach(subject => {
+        subject.units.forEach(unit => {
+            unit.topics.forEach(topic => {
+                if (topic.toLowerCase().includes(q)) {
+                    results.push({
+                        subject: subject.name,
+                        subjectCode: subject.code,
+                        unit: unit.number,
+                        unitTitle: unit.title,
+                        topic
+                    });
+                }
+            });
+        });
+    });
+    
+    return results;
+}

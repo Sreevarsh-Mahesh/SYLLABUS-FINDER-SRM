@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRM Syllabus Finder | CINTEL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">📚</div>
+                <div class="logo-text">
+                    <h1>SRM Syllabus Finder</h1>
+                    <span class="dept-badge">CINTEL Department</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <main class="chat-container">
+            <div class="messages" id="messages">
+                <!-- Welcome Message -->
+                <div class="message bot-message">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <p>Hi! I'm your <strong>Syllabus Finder</strong> assistant for SRM CINTEL department.</p>
+                        <p>Ask me about any subject syllabus! Try:</p>
+                        <div class="suggestions">
+                            <button class="suggestion-btn" onclick="askQuestion('What is the syllabus for AgentOps?')">📖 AgentOps Syllabus</button>
+                            <button class="suggestion-btn" onclick="askQuestion('Show me Machine Learning syllabus')">🤖 Machine Learning</button>
+                            <button class="suggestion-btn" onclick="askQuestion('What topics are in Deep Learning Unit 2?')">🧠 Deep Learning</button>
+                            <button class="suggestion-btn" onclick="askQuestion('List all available subjects')">📋 All Subjects</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-container">
+                <input 
+                    type="text" 
+                    id="userInput" 
+                    placeholder="Ask about any subject syllabus..." 
+                    autocomplete="off"
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="powered-by">Powered by AI • SRM CINTEL Department</p>
+        </div>
+    </div>
+
+    <script src="syllabus.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
