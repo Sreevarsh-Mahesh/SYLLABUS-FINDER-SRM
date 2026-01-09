@@ -2,35 +2,11 @@
 const LLM_CONFIG = {
     // Backend API URL (HuggingFace Spaces)
     backendUrl: 'https://sreevarsh-srm-study-buddy.hf.space',
-
-    // Fallback to local for development
-    localBackend: 'http://localhost:7860',
-
-    // For direct API calls (fallback)
-    geminiKey: localStorage.getItem('GEMINI_API_KEY') || ''
 };
 
 // Conversation history for context
 let conversationHistory = [];
 const MAX_HISTORY = 10;
-
-// Check if we're in development mode
-function isLocalDev() {
-    return window.location.protocol === 'file:' ||
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1';
-}
-
-// Get the API URL
-function getApiUrl() {
-    if (isLocalDev()) {
-        return LLM_CONFIG.localBackend;
-    }
-    // In production, use the configured backend
-    return LLM_CONFIG.backendUrl !== 'https://your-space.hf.space'
-        ? LLM_CONFIG.backendUrl
-        : LLM_CONFIG.localBackend;
-}
 
 // Add message to history
 function addToHistory(role, content) {
@@ -42,16 +18,13 @@ function addToHistory(role, content) {
 
 // Main LLM call function
 async function callLLM(userMessage, syllabusContext) {
-    console.log('Calling Study Buddy API with:', userMessage);
+    console.log('Calling Study Buddy API:', userMessage);
 
     // Add user message to history
     addToHistory('user', userMessage);
 
-    const apiUrl = getApiUrl();
-
     try {
-        // Try the RAG backend first
-        const response = await fetch(`${apiUrl}/api/query`, {
+        const response = await fetch(`${LLM_CONFIG.backendUrl}/api/query`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -62,81 +35,64 @@ async function callLLM(userMessage, syllabusContext) {
             })
         });
 
-        if (response.ok) {
-            const data = await response.json();
-            const assistantMessage = data.response;
-
-            // Add to history
-            if (assistantMessage) {
-                addToHistory('assistant', assistantMessage);
-            }
-
-            // Return with sources if available
-            if (data.sources && data.sources.length > 0) {
-                const sourceInfo = data.sources
-                    .filter(s => s.subject !== 'Unknown')
-                    .map(s => `📚 ${s.subject} - ${s.unit}`)
-                    .join('\n');
-
-                return assistantMessage + (sourceInfo ? `\n\n---\n*Sources:*\n${sourceInfo}` : '');
-            }
-
-            return assistantMessage;
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
         }
 
-        console.log('Backend unavailable, falling back to local...');
-    } catch (error) {
-        console.log('Backend error, using fallback:', error.message);
-    }
+        const data = await response.json();
+        const assistantMessage = data.response;
 
-    // Fallback: Use local syllabus data with Gemini directly
-    return await fallbackLLMCall(userMessage, syllabusContext);
+        // Add to history
+        if (assistantMessage) {
+            addToHistory('assistant', assistantMessage);
+        }
+
+        // Return with sources if available
+        if (data.sources && data.sources.length > 0) {
+            const sourceInfo = data.sources
+                .map(s => `📚 ${s.subject}`)
+                .join(', ');
+
+            return assistantMessage + `\n\n---\n*Source: ${sourceInfo}*`;
+        }
+
+        return assistantMessage;
+
+    } catch (error) {
+        console.error('API Error:', error);
+
+        // Fallback to local syllabus data
+        return generateLocalResponse(userMessage, syllabusContext);
+    }
 }
 
-// Fallback function for direct Gemini calls
-async function fallbackLLMCall(userMessage, syllabusContext) {
-    const geminiKey = LLM_CONFIG.geminiKey || localStorage.getItem('GEMINI_API_KEY');
+// Fallback function using local syllabus data
+function generateLocalResponse(query, syllabusData) {
+    const queryLower = query.toLowerCase();
 
-    if (!geminiKey) {
-        return "⚠️ Backend unavailable and no API key configured. Please set up the backend or add a Gemini API key.";
-    }
+    // Search for matching subject
+    for (const subject of syllabusData.subjects || []) {
+        if (subject.name.toLowerCase().includes(queryLower) ||
+            queryLower.includes(subject.name.toLowerCase())) {
 
-    const prompt = `You are a helpful SRM University study buddy.
-
-SYLLABUS DATA:
-${JSON.stringify(syllabusContext, null, 2)}
-
-STUDENT QUESTION: ${userMessage}
-
-Provide a helpful response:`;
-
-    try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
+            let response = `**${subject.name}** (${subject.code})\n\n`;
+            for (const unit of subject.units || []) {
+                response += `**Unit ${unit.number}: ${unit.title}**\n`;
+                response += unit.topics.map(t => `• ${t}`).join('\n') + '\n\n';
             }
-        );
-
-        if (response.ok) {
-            const data = await response.json();
-            return data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response.";
+            return response;
         }
-    } catch (error) {
-        console.error('Fallback LLM error:', error);
     }
 
-    return "Sorry, I'm having trouble connecting. Please try again.";
+    // List available subjects
+    const subjects = (syllabusData.subjects || []).map(s => s.name).join(', ');
+    return `I couldn't connect to the AI backend. Here are the available subjects: ${subjects}\n\nTry asking about a specific subject like "Machine Learning" or "Deep Learning".`;
 }
 
 // Check if LLM/Backend is configured
 function isLLMConfigured() {
-    // Always return true - we'll handle errors gracefully
-    return true;
+    return true; // Always try
 }
 
 // Format LLM response to HTML
@@ -164,44 +120,8 @@ function formatLLMResponse(text) {
 
     // Convert bullet lists
     html = html.replace(/<p>- (.+?)(<br>|<\/p>)/g, '<li>$1</li>$2');
+    html = html.replace(/<p>• (.+?)(<br>|<\/p>)/g, '<li>$1</li>$2');
     html = html.replace(/(<li>.+<\/li>)+/g, '<ul>$&</ul>');
 
     return html;
-}
-
-// Semantic search function
-async function searchSyllabus(query) {
-    const apiUrl = getApiUrl();
-
-    try {
-        const response = await fetch(`${apiUrl}/api/search`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
-        });
-
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error('Search error:', error);
-    }
-
-    return { results: [], count: 0 };
-}
-
-// Get available subjects
-async function getIndexedSubjects() {
-    const apiUrl = getApiUrl();
-
-    try {
-        const response = await fetch(`${apiUrl}/api/subjects`);
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error('Get subjects error:', error);
-    }
-
-    return { subjects: [], count: 0 };
 }
