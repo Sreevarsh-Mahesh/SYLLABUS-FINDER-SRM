@@ -3,8 +3,8 @@ const LLM_CONFIG = {
     // Use our secure serverless API (API key is stored server-side)
     apiUrl: '/api/chat',
 
-    // Model to use (free tier)
-    model: 'meta-llama/llama-3.1-8b-instruct:free',
+    // Model to use (free tier) - Google Gemma 3n E4B
+    model: 'google/gemma-3n-e4b-it:free',
 
     // For local development, you can set a key in localStorage
     // For production (Vercel), the key is in environment variables
