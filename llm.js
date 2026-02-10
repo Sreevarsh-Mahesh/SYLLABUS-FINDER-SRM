@@ -1,14 +1,58 @@
-// LLM Configuration for Study Buddy
+// LLM Configuration for Study Buddy with Redis Memory Support
 const LLM_CONFIG = {
     // Backend API URL (HuggingFace Spaces)
     backendUrl: 'https://sreevarsh-srm-study-buddy.hf.space',
 };
 
-// Conversation history for context
+// Session management for persistent memory
+const SESSION_STORAGE_KEY = 'srm_study_buddy_session';
+
+// Get or create session ID
+function getSessionId() {
+    let sessionId = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!sessionId) {
+        sessionId = generateSessionId();
+        localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+    }
+    return sessionId;
+}
+
+// Generate a unique session ID
+function generateSessionId() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Clear session and start fresh
+function clearSession() {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    conversationHistory = [];
+
+    // Also clear on server
+    const sessionId = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (sessionId) {
+        fetch(`${LLM_CONFIG.backendUrl}/api/session/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+        }).catch(e => console.log('Session clear error:', e));
+    }
+
+    // Generate new session
+    const newSessionId = generateSessionId();
+    localStorage.setItem(SESSION_STORAGE_KEY, newSessionId);
+
+    return newSessionId;
+}
+
+// Local conversation history (backup/fallback)
 let conversationHistory = [];
 const MAX_HISTORY = 10;
 
-// Add message to history
+// Add message to local history (fallback)
 function addToHistory(role, content) {
     conversationHistory.push({ role, content });
     if (conversationHistory.length > MAX_HISTORY) {
@@ -16,11 +60,14 @@ function addToHistory(role, content) {
     }
 }
 
-// Main LLM call function
+// Main LLM call function with session support
 async function callLLM(userMessage, syllabusContext) {
     console.log('Calling Study Buddy API:', userMessage);
 
-    // Add user message to history
+    // Get session ID for memory
+    const sessionId = getSessionId();
+
+    // Add user message to local history (fallback)
     addToHistory('user', userMessage);
 
     try {
@@ -31,7 +78,8 @@ async function callLLM(userMessage, syllabusContext) {
             },
             body: JSON.stringify({
                 query: userMessage,
-                history: conversationHistory.slice(-5)
+                session_id: sessionId,  // Pass session ID for server-side memory
+                history: conversationHistory.slice(-5)  // Fallback local history
             })
         });
 
@@ -43,21 +91,27 @@ async function callLLM(userMessage, syllabusContext) {
         const data = await response.json();
         const assistantMessage = data.response;
 
-        // Add to history
+        // Update session ID if server returned a different one
+        if (data.session_id && data.session_id !== sessionId) {
+            localStorage.setItem(SESSION_STORAGE_KEY, data.session_id);
+        }
+
+        // Add to local history (as backup)
         if (assistantMessage) {
             addToHistory('assistant', assistantMessage);
         }
 
-        // Return with sources if available
+        // Build response with sources
+        let finalResponse = assistantMessage;
+
         if (data.sources && data.sources.length > 0) {
             const sourceInfo = data.sources
                 .map(s => `📚 ${s.department || s.file}`)
                 .join(', ');
-
-            return assistantMessage + `\n\n---\n*Source: ${sourceInfo}*`;
+            finalResponse += `\n\n---\n*Source: ${sourceInfo}*`;
         }
 
-        return assistantMessage;
+        return finalResponse;
 
     } catch (error) {
         console.error('API Error:', error);
@@ -108,3 +162,35 @@ function formatLLMResponse(text) {
         return '<p>' + text.replace(/\n/g, '<br>') + '</p>';
     }
 }
+
+// Get memory status from backend
+async function getMemoryStatus() {
+    try {
+        const response = await fetch(`${LLM_CONFIG.backendUrl}/`);
+        const data = await response.json();
+        return {
+            memoryEnabled: data.memory_enabled || false,
+            redisConnected: data.redis_connected || false
+        };
+    } catch (e) {
+        return { memoryEnabled: false, redisConnected: false };
+    }
+}
+
+// Get conversation history from server
+async function getServerHistory() {
+    const sessionId = getSessionId();
+    try {
+        const response = await fetch(`${LLM_CONFIG.backendUrl}/api/session/${sessionId}/history`);
+        const data = await response.json();
+        return data.history || [];
+    } catch (e) {
+        console.error('Failed to get server history:', e);
+        return [];
+    }
+}
+
+// Export for use in app.js
+window.clearChatSession = clearSession;
+window.getMemoryStatus = getMemoryStatus;
+window.getServerHistory = getServerHistory;

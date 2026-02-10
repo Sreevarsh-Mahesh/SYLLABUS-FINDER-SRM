@@ -1,3 +1,8 @@
+// =====================================================
+// SRM Study Buddy - App Controller
+// Clean Minimalist UI
+// =====================================================
+
 // App State
 let isLoading = false;
 
@@ -5,6 +10,76 @@ let isLoading = false;
 const messagesContainer = document.getElementById('messages');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
+const headerStatus = document.getElementById('headerStatus');
+
+// Update header status text
+function setHeaderStatus(text, isThinking = false) {
+    if (headerStatus) {
+        headerStatus.textContent = text;
+        headerStatus.classList.toggle('thinking', isThinking);
+    }
+}
+
+// Start a new chat session
+function startNewChat() {
+    // Clear server-side memory
+    if (window.clearChatSession) {
+        window.clearChatSession();
+    }
+
+    // Clear chat UI
+    messagesContainer.innerHTML = '';
+
+    // Add fresh welcome message
+    const welcomeDiv = document.createElement('div');
+    welcomeDiv.className = 'message bot-message';
+    welcomeDiv.innerHTML = `
+        <div class="message-header">
+            <div class="message-avatar">
+                <svg viewBox="0 0 40 40" fill="none">
+                    <circle cx="13" cy="20" r="6" stroke="white" stroke-width="2" fill="none"/>
+                    <circle cx="27" cy="20" r="6" stroke="white" stroke-width="2" fill="none"/>
+                    <path d="M21 20 H19" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="13" cy="20" r="2" fill="white"/>
+                    <circle cx="27" cy="20" r="2" fill="white"/>
+                </svg>
+            </div>
+            <span class="bot-name">Study Buddy</span>
+        </div>
+        <div class="message-content">
+            <p>🔄 <strong>New conversation started!</strong></p>
+            <p>I've cleared our chat. What subject would you like to explore?</p>
+            <div class="suggestions">
+                <button class="suggestion-btn" onclick="askQuestion('Machine Learning syllabus')">Machine Learning</button>
+                <button class="suggestion-btn" onclick="askQuestion('Deep Learning syllabus')">Deep Learning</button>
+                <button class="suggestion-btn" onclick="askQuestion('List all subjects')">All Subjects</button>
+            </div>
+        </div>
+    `;
+    messagesContainer.appendChild(welcomeDiv);
+
+    // Reset header status
+    setHeaderStatus('Ready to help');
+
+    // Focus input
+    userInput.focus();
+
+    // Show toast
+    showToast('New chat started!');
+}
+
+// Toast notification
+function showToast(message) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 3000);
+}
 
 // Handle Enter key
 function handleKeyPress(event) {
@@ -28,13 +103,16 @@ function sendMessage() {
     addMessage(message, 'user');
     userInput.value = '';
 
+    // Update header status
+    setHeaderStatus('Thinking...', true);
+
     // Show typing indicator
     showTyping();
 
-    // Process with slight delay for natural feel
+    // Process with slight delay
     setTimeout(() => {
         processQuery(message);
-    }, 500);
+    }, 300);
 }
 
 // Add message to chat
@@ -42,21 +120,31 @@ function addMessage(content, type) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
 
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    avatar.textContent = type === 'bot' ? '🤖' : '👤';
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-
-    if (typeof content === 'string') {
-        contentDiv.innerHTML = content;
+    if (type === 'bot') {
+        // Bot message with header
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <div class="message-avatar">
+                    <svg viewBox="0 0 40 40" fill="none">
+                        <circle cx="13" cy="20" r="6" stroke="white" stroke-width="2" fill="none"/>
+                        <circle cx="27" cy="20" r="6" stroke="white" stroke-width="2" fill="none"/>
+                        <path d="M21 20 H19" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="13" cy="20" r="2" fill="white"/>
+                        <circle cx="27" cy="20" r="2" fill="white"/>
+                    </svg>
+                </div>
+                <span class="bot-name">Study Buddy</span>
+            </div>
+            <div class="message-content">${content}</div>
+        `;
     } else {
-        contentDiv.appendChild(content);
+        // User message with avatar
+        messageDiv.innerHTML = `
+            <div class="message-content">${content}</div>
+            <div class="message-avatar"></div>
+        `;
     }
 
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(contentDiv);
     messagesContainer.appendChild(messageDiv);
 
     // Scroll to bottom
@@ -73,7 +161,18 @@ function showTyping() {
     typingDiv.id = 'typing-indicator';
 
     typingDiv.innerHTML = `
-        <div class="message-avatar">🤖</div>
+        <div class="message-header">
+            <div class="message-avatar">
+                <svg viewBox="0 0 40 40" fill="none">
+                    <circle cx="13" cy="20" r="6" stroke="white" stroke-width="2" fill="none"/>
+                    <circle cx="27" cy="20" r="6" stroke="white" stroke-width="2" fill="none"/>
+                    <path d="M21 20 H19" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="13" cy="20" r="2" fill="white"/>
+                    <circle cx="27" cy="20" r="2" fill="white"/>
+                </svg>
+            </div>
+            <span class="bot-name">Study Buddy</span>
+        </div>
         <div class="message-content">
             <div class="typing-indicator">
                 <span></span>
@@ -91,272 +190,50 @@ function showTyping() {
 function hideTyping() {
     isLoading = false;
     sendBtn.disabled = false;
+
     const typing = document.getElementById('typing-indicator');
     if (typing) typing.remove();
+
+    // Reset header status
+    setHeaderStatus('Ready to help');
 }
 
 // Process user query
 async function processQuery(query) {
-    const q = query.toLowerCase();
     let response;
-    let usedLLM = false;
 
-    // If LLM is configured, always try it first for intelligent responses
+    // Always use LLM backend
     if (isLLMConfigured()) {
-        // Always pass full syllabus data for maximum context
-        const context = syllabusData;
+        const context = typeof syllabusData !== 'undefined' ? syllabusData : {};
+        response = await callLLM(query, context);
 
-        try {
-            const llmResponse = await callLLM(query, context);
-            if (llmResponse) {
-                response = formatLLMResponse(llmResponse);
-                usedLLM = true;
-            }
-        } catch (error) {
-            console.error('LLM error:', error);
-            // Fall through to local search
+        if (response) {
+            // Format response using marked.js
+            const formatted = formatLLMResponse(response);
+            hideTyping();
+            addMessage(formatted || response, 'bot');
+            return;
         }
     }
 
-    // If no LLM response, use local search
-    if (!response) {
-        // Check for list all subjects
-        if (q.includes('list') && (q.includes('subject') || q.includes('all'))) {
-            response = createSubjectsList();
-        }
-        // Check for specific unit query
-        else if (q.includes('unit')) {
-            const unitMatch = q.match(/unit\s*(\d+)/i);
-            const unitNum = unitMatch ? parseInt(unitMatch[1]) : null;
-
-            // Try to find subject name in query
-            const subject = findSubjectInQuery(q);
-
-            if (subject && unitNum) {
-                const result = findSubjectUnit(subject.name, unitNum);
-                if (result && result.unit) {
-                    response = createUnitCard(result.subject, result.unit);
-                } else {
-                    response = `<p>I couldn't find Unit ${unitNum} for <strong>${subject.name}</strong>. This subject has ${subject.units.length} units.</p>`;
-                }
-            } else if (subject) {
-                response = createSyllabusCard(subject);
-            } else {
-                response = `<p>I couldn't identify the subject. Try asking about a specific subject like:</p>
-                    <div class="suggestions">
-                        <button class="suggestion-btn" onclick="askQuestion('What is Unit 1 of AgentOps?')">Unit 1 of AgentOps</button>
-                        <button class="suggestion-btn" onclick="askQuestion('Show me Deep Learning Unit 2')">Deep Learning Unit 2</button>
-                    </div>`;
-            }
-        }
-        // Check for syllabus query
-        else if (q.includes('syllabus') || q.includes('what is') || q.includes('show me') || q.includes('tell me about')) {
-            const subject = findSubjectInQuery(q);
-            if (subject) {
-                response = createSyllabusCard(subject);
-            } else {
-                response = `<p>I couldn't find that subject. Here are the available subjects:</p>` + createSubjectsList();
-            }
-        }
-        // Check for topic search
-        else if (q.includes('topic') || q.includes('where') || q.includes('find')) {
-            const topics = searchTopics(q.replace(/topic|where|find|is|the|in|which/gi, '').trim());
-            if (topics.length > 0) {
-                response = createTopicResults(topics);
-            } else {
-                response = `<p>I couldn't find that topic. Try searching for something else or view a subject's syllabus.</p>`;
-            }
-        }
-        // Default: try to find a subject
-        else {
-            const subject = findSubjectInQuery(q);
-            if (subject) {
-                response = createSyllabusCard(subject);
-            } else {
-                // If LLM is not configured, show helper message
-                if (!isLLMConfigured()) {
-                    response = `<p>I'm not sure what you're looking for. Here's what I can help you with:</p>
-                        <div class="suggestions">
-                            <button class="suggestion-btn" onclick="askQuestion('List all subjects')">📋 All Subjects</button>
-                            <button class="suggestion-btn" onclick="askQuestion('What is the syllabus for Machine Learning?')">🤖 ML Syllabus</button>
-                            <button class="suggestion-btn" onclick="askQuestion('Show me Deep Learning Unit 4')">🧠 DL Unit 4</button>
-                        </div>
-                        <p style="margin-top: 12px; font-size: 0.85rem; color: var(--text-muted);">💡 <em>Tip: Add an OpenRouter API key in llm.js for smarter responses!</em></p>`;
-                } else {
-                    // Try LLM for unknown queries
-                    const llmResponse = await callLLM(query, { subjects: getAllSubjects() });
-                    if (llmResponse) {
-                        response = formatLLMResponse(llmResponse);
-                        usedLLM = true;
-                    } else {
-                        response = `<p>I couldn't understand that. Try asking about a specific subject or topic.</p>`;
-                    }
-                }
-            }
-        }
-    }
-
+    // Fallback response
     hideTyping();
+    addMessage("I'm having trouble connecting to the AI. Please try again in a moment.", 'bot');
+}
 
-    if (typeof response === 'string') {
-        addMessage(response, 'bot');
-    } else {
-        const container = document.createElement('div');
-        container.appendChild(response);
-        addMessage(container, 'bot');
+// Check if LLM is configured
+function isLLMConfigured() {
+    return typeof callLLM === 'function';
+}
+
+// Format LLM response to HTML using marked.js
+function formatLLMResponse(text) {
+    if (!text) return null;
+
+    try {
+        return marked.parse(text);
+    } catch (e) {
+        console.error("Markdown parsing error:", e);
+        return '<p>' + text.replace(/\n/g, '<br>') + '</p>';
     }
 }
-
-// Find subject in query
-function findSubjectInQuery(query) {
-    const q = query.toLowerCase();
-
-    // Check each subject
-    for (const subject of syllabusData.subjects) {
-        if (q.includes(subject.name.toLowerCase()) ||
-            q.includes(subject.code.toLowerCase()) ||
-            q.includes(subject.fullName.toLowerCase())) {
-            return subject;
-        }
-    }
-
-    // Check for partial matches
-    const keywords = {
-        'agent': 'AgentOps',
-        'agentops': 'AgentOps',
-        'ml': 'Machine Learning',
-        'machine': 'Machine Learning',
-        'deep': 'Deep Learning',
-        'dl': 'Deep Learning',
-        'nlp': 'NLP',
-        'natural': 'NLP',
-        'language': 'NLP',
-        'cv': 'Computer Vision',
-        'vision': 'Computer Vision',
-        'image': 'Computer Vision'
-    };
-
-    for (const [keyword, subjectName] of Object.entries(keywords)) {
-        if (q.includes(keyword)) {
-            return findSubject(subjectName);
-        }
-    }
-
-    return null;
-}
-
-// Create syllabus card HTML
-function createSyllabusCard(subject) {
-    const card = document.createElement('div');
-    card.innerHTML = `
-        <p>Here's the complete syllabus for <strong>${subject.name}</strong>:</p>
-        <div class="syllabus-card">
-            <div class="syllabus-header">
-                <h3>${subject.fullName}</h3>
-                <span class="code">${subject.code}</span>
-            </div>
-            <div class="syllabus-meta">
-                <span>📚 ${subject.credits} Credits</span>
-                <span>📋 ${subject.type}</span>
-                <span>📖 ${subject.units.length} Units</span>
-            </div>
-            <div class="syllabus-units">
-                ${subject.units.map(unit => `
-                    <div class="unit">
-                        <div class="unit-title">Unit ${unit.number}: ${unit.title}</div>
-                        <ul class="unit-topics">
-                            ${unit.topics.map(topic => `<li>${topic}</li>`).join('')}
-                        </ul>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-    return card;
-}
-
-// Create unit card HTML
-function createUnitCard(subject, unit) {
-    const card = document.createElement('div');
-    card.innerHTML = `
-        <p>Here's <strong>Unit ${unit.number}</strong> of <strong>${subject.name}</strong>:</p>
-        <div class="syllabus-card">
-            <div class="syllabus-header">
-                <h3>${unit.title}</h3>
-                <span class="code">${subject.code} - Unit ${unit.number}</span>
-            </div>
-            <div class="syllabus-units">
-                <div class="unit">
-                    <ul class="unit-topics">
-                        ${unit.topics.map(topic => `<li>${topic}</li>`).join('')}
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="suggestions" style="margin-top: 12px;">
-            ${unit.number > 1 ? `<button class="suggestion-btn" onclick="askQuestion('Show me ${subject.name} Unit ${unit.number - 1}')">← Unit ${unit.number - 1}</button>` : ''}
-            ${unit.number < subject.units.length ? `<button class="suggestion-btn" onclick="askQuestion('Show me ${subject.name} Unit ${unit.number + 1}')">Unit ${unit.number + 1} →</button>` : ''}
-            <button class="suggestion-btn" onclick="askQuestion('What is the complete syllabus for ${subject.name}?')">Full Syllabus</button>
-        </div>
-    `;
-    return card;
-}
-
-// Create subjects list HTML
-function createSubjectsList() {
-    const subjects = getAllSubjects();
-    return `
-        <p>Here are all available <strong>CINTEL</strong> subjects:</p>
-        <div class="subjects-list">
-            ${subjects.map(s => `
-                <div class="subject-item" onclick="askQuestion('What is the syllabus for ${s.name}?')">
-                    <div>
-                        <div class="name">${s.fullName}</div>
-                        <div class="code">${s.code} • ${s.credits} Credits • ${s.type}</div>
-                    </div>
-                    <span>→</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-// Create topic results HTML
-function createTopicResults(topics) {
-    const grouped = topics.reduce((acc, t) => {
-        const key = `${t.subjectCode}-${t.unit}`;
-        if (!acc[key]) {
-            acc[key] = {
-                subject: t.subject,
-                subjectCode: t.subjectCode,
-                unit: t.unit,
-                unitTitle: t.unitTitle,
-                topics: []
-            };
-        }
-        acc[key].topics.push(t.topic);
-        return acc;
-    }, {});
-
-    const results = Object.values(grouped);
-
-    return `
-        <p>Found <strong>${topics.length}</strong> matching topic(s):</p>
-        <div class="subjects-list">
-            ${results.map(r => `
-                <div class="subject-item" onclick="askQuestion('Show me ${r.subject} Unit ${r.unit}')">
-                    <div>
-                        <div class="name">${r.topics[0]}</div>
-                        <div class="code">${r.subject} - Unit ${r.unit}: ${r.unitTitle}</div>
-                    </div>
-                    <span>→</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-// Focus input on load
-document.addEventListener('DOMContentLoaded', () => {
-    userInput.focus();
-});
