@@ -164,35 +164,36 @@ SYSTEM_PROMPT = """You are SRM Study Buddy — an intelligent syllabus assistant
    - NEVER list degree programs or department names as if they were subjects.
 
 2. **WHEN SHOWING A SYLLABUS:**
-   - Show ALL units (typically Unit 1 to Unit 5).
-   - List EVERY topic exactly as it appears — no shortening, no summarizing, no omitting.
+   - You will receive the **FULL DOCUMENT TEXT** reconstructed from the database.
+   - This means you have the COMPLETE syllabus (Unit 1 to Unit 5).
+   - **CRITICAL:** Do NOT omit any unit or topic. List EVERY topic exactly as it appears.
    - Format:
    
      ## Subject Name [Subject Code]
      
      **Unit 1: [Title]**
      - Topic 1
-     - Topic 2
      - ...
      
      **Unit 2: [Title]**
      - Topic 1
      - ...
+     
+     (Continue for ALL units)
 
 3. **WHEN THE STUDENT SAYS "yes", a number, or confirms:**
    - Look at the PREVIOUS CONVERSATION to understand what they're confirming.
-   - Show the syllabus for the confirmed subject immediately. Do NOT search for something new.
+   - Show the syllabus for the confirmed subject immediately.
    - NEVER respond to "yes" by asking another question or showing unrelated subjects.
 
 4. **EXAM MAPPING:**
    - CT1 = Units 1 and 2
    - CT2 = Units 3 and 4  
    - Semester Exam = All Units (1-5)
-   - Still show COMPLETE unit content, not summaries.
 
 5. **IGNORE NOISE IN CONTEXT:**
-   - The retrieved context may contain degree program descriptions, prospectus text, handbook content, or department overviews.
-   - IGNORE all of that. Only extract and present actual SUBJECT information (name, code, units, topics).
+   - The context is a full PDF dump. It may contain cover pages, regulations, or unrelated courses.
+   - IGNORE all of that. Only extract the specific subject requested.
    - If the context contains no actual subject syllabus data, say: "I couldn't find a specific subject syllabus for that. Could you tell me the exact subject name or code?"
 
 6. **CONVERSATION MEMORY:**
@@ -306,12 +307,17 @@ def extract_subject_from_history(history: List[dict]) -> str:
 
 
 def search_qdrant(query: str, department: str = None, limit: int = 5) -> tuple[str, list]:
-    """Semantic search in Qdrant with optional department filtering"""
+    """
+    Smart Semantic Search:
+    1. Find top matching chunk.
+    2. Identify its source filename.
+    3. Fetch ALL chunks for that filename (reconstruct full document).
+    """
     if not qdrant:
         return "", []
     
     try:
-        # Generate embedding for query
+        # Step 1: Initial vector search to find best match
         query_embedding = embedder.encode(query).tolist()
         
         # Build filter for department (for future use)
@@ -327,34 +333,73 @@ def search_qdrant(query: str, department: str = None, limit: int = 5) -> tuple[s
                 ]
             )
         
-        # Search Qdrant
+        # Search Qdrant for TOP MATCH only (to identify file)
         results = qdrant.query_points(
             collection_name=COLLECTION_NAME,
             query=query_embedding,
             query_filter=query_filter,
-            limit=limit,
+            limit=5,
             with_payload=True
         )
+
+        if not results.points:
+            return "", []
         
-        context_parts = []
+        # Step 2: Extract top filename and sources
+        top_result = results.points[0]
+        best_filename = top_result.payload.get("filename", "")
+        best_dept = top_result.payload.get("department", "Unknown")
+        
         sources = []
-        
         for result in results.points:
-            payload = result.payload
-            text = payload.get("text", "")
-            dept = payload.get("department", "Unknown")
-            filename = payload.get("filename", "")
-            
-            context_parts.append(f"[{dept}]\n{text}")
-            
-            if dept not in [s.get("department") for s in sources]:
+            dept = result.payload.get("department", "Unknown")
+            fname = result.payload.get("filename", "")
+            if fname not in [s.get("file") for s in sources]:
                 sources.append({
                     "department": dept,
-                    "file": filename,
+                    "file": fname,
                     "score": round(result.score, 3)
                 })
         
-        return "\n\n---\n\n".join(context_parts), sources
+        if not best_filename:
+            return "", sources
+            
+        print(f"🎯 Top match found in: {best_filename} ({best_dept})")
+        
+        # Step 3: Fetch ALL chunks for this file
+        # We use a filter to get all points with this filename
+        file_filter = rest.Filter(
+            must=[
+                rest.FieldCondition(
+                    key="filename",
+                    match=rest.MatchValue(value=best_filename)
+                )
+            ]
+        )
+        
+        # Scroll to get all chunks (limit 1000 should cover any PDF)
+        all_chunks, _ = qdrant.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=file_filter,
+            limit=1000,
+            with_payload=True
+        )
+        
+        # Step 4: Sort by ID (assuming integer IDs preserve order)
+        # We try to convert ID to int for sorting, fallback to default sort
+        try:
+            all_chunks.sort(key=lambda x: int(x.id))
+        except:
+            all_chunks.sort(key=lambda x: x.id)
+            
+        # Step 5: Reconstruction
+        print(f"📄 Reconstructing document from {len(all_chunks)} chunks...")
+        full_text = f"SOURCE DOCUMENT: {best_filename} ({best_dept})\n\n"
+        
+        for point in all_chunks:
+            full_text += point.payload.get("text", "") + "\n\n"
+            
+        return full_text, sources
         
     except Exception as e:
         print(f"Qdrant search error: {e}")
@@ -516,7 +561,7 @@ async def query(request: QueryRequest):
     # ============= BUILD PROMPT =============
     if is_followup and conversation_history:
         if context:
-            prompt = f"""RELEVANT SYLLABUS CONTENT:
+            prompt = f"""RELEVANT SYLLABUS DOCUMENT:
 {context}
 
 The student's previous conversation is shown above. They just said: "{user_query}"
@@ -529,7 +574,7 @@ This is a CONFIRMATION or SELECTION responding to your previous message.
 Use the conversation history to understand what subject they confirmed, and show the complete syllabus.
 Do NOT ask another clarifying question."""
     elif context:
-        prompt = f"""RELEVANT SYLLABUS CONTENT:
+        prompt = f"""RELEVANT SYLLABUS DOCUMENT:
 {context}
 
 STUDENT QUESTION: {user_query}
